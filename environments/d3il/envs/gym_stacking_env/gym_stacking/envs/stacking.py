@@ -1,23 +1,20 @@
-import random
+
+import copy
 
 import cv2
 import numpy as np
-import copy
-import time
-
 from gym.spaces import Box
 
-from environments.d3il.d3il_sim.utils.sim_path import d3il_path
-from environments.d3il.d3il_sim.controllers.Controller import ControllerBase
 from environments.d3il.d3il_sim.core import Scene
-from environments.d3il.d3il_sim.core.logger import ObjectLogger, CamLogger
+from environments.d3il.d3il_sim.core.logger import CamLogger, ObjectLogger
 from environments.d3il.d3il_sim.gyms.gym_env_wrapper import GymEnvWrapper
 from environments.d3il.d3il_sim.gyms.gym_utils.helpers import obj_distance
-from environments.d3il.d3il_sim.utils.geometric_transformation import euler2quat, quat2euler
-
-from environments.d3il.d3il_sim.sims.mj_beta.MjRobot import MjRobot
-from environments.d3il.d3il_sim.sims.mj_beta.MjFactory import MjFactory
 from environments.d3il.d3il_sim.sims import MjCamera
+from environments.d3il.d3il_sim.sims.mj_beta.MjFactory import MjFactory
+from environments.d3il.d3il_sim.sims.mj_beta.MjRobot import MjRobot
+from environments.d3il.d3il_sim.utils.geometric_transformation import (
+    euler2quat, quat2euler)
+from environments.d3il.d3il_sim.utils.sim_path import d3il_path
 
 from .objects.stacking_objects import get_obj_list, init_end_eff_pos
 
@@ -131,12 +128,6 @@ class BlockContextManager:
             obj_name="blue_box",
         )
 
-        # self.scene.set_obj_pos_and_quat(
-        #     [target_pos[0], target_pos[1], 0],
-        #     [0, 1, 0, 0],
-        #     obj_name="target_box",
-        # )
-
     def set_index(self, index):
         self.index = index
 
@@ -162,7 +153,6 @@ class CubeStacking_Env(GymEnvWrapper):
             scene,
             xml_path=d3il_path("./models/mj/robot/panda.xml"),
         )
-        # controller = robot.cartesianPosQuatTrackingController
         controller = robot.jointTrackingController
 
         super().__init__(

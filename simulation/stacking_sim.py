@@ -1,21 +1,15 @@
 import logging
-import os
-import copy
-
-from multiprocessing import Process
 import multiprocessing as mp
+import os
 import random
 
 import numpy as np
 import torch
-import hydra
 import wandb
+from envs.gym_stacking_env.gym_stacking.envs.stacking import CubeStacking_Env
 
-from simulation.base_sim import BaseSim
 from agents.utils.sim_path import sim_framework_path
-
-import gym
-import gym_stacking
+from simulation.base_sim import BaseSim
 
 log = logging.getLogger(__name__)
 
@@ -67,40 +61,13 @@ class Stacking_Sim(BaseSim):
         self.mode_encoding_2 = torch.tensor(self.mode_encoding_2)
         self.mode_encoding_3 = torch.tensor(self.mode_encoding_3)
 
-        # self.mode_keys = np.array(list(self.modes.keys()))
-        # self.n_mode = len(self.mode_keys)
-        #
-        # self.mode_dict = {}
-        #
-        # mode_encoding = []
-        #
-        # for i in range(self.n_mode):
-        #     mode_encoding.append(self.modes[self.mode_keys[i]])
-        #     self.mode_dict[self.mode_keys[i]] = i + 100
-        #
-        # self.mode_encoding = torch.tensor(mode_encoding)
-        #
-        # #################################################################
-        # self.box_1_modes = {'r':0, 'g':0, 'b':0}
-        # for mode_key in self.mode_keys:
-        #     self.box_1_modes[mode_key[0]] += self.modes[mode_key]
-        #
-        # self.box_1_mode_keys = list(self.box_1_modes.keys())
-        #
-        # mode_encoding_box1 = []
-        # for i in range(3):
-        #     mode_encoding_box1.append(self.box_1_modes[self.box_1_mode_keys[i]])
-        #     self.mode_dict[self.box_1_mode_keys[i]] = i + 200
-        #
-        # self.mode_encoding_box1 = torch.tensor(mode_encoding_box1)
-
     def eval_agent(self, agent, contexts, n_trajectories, mode_encoding, mode_encoding_1_box, mode_encoding_2_box,
                    successes, successes_1, successes_2, cpu_set, pid):
 
         print(os.getpid(), cpu_set)
         assign_process_to_cpu(os.getpid(), cpu_set)
 
-        env = gym.make('stacking-v0', max_steps_per_episode=self.max_steps_per_episode, render=self.render)
+        env = CubeStacking_Env(max_steps_per_episode=self.max_steps_per_episode, render=self.render)
         env.start()
 
         random.seed(pid)

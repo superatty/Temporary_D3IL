@@ -1,19 +1,17 @@
 defaults:
-  - agents: ddpm_transformer_agent
-#  - override hydra/launcher: submitit_slurm
+  - agents: bc_agent
 
-agent_name: ddpm_transformer
+agent_name: bc
 log_dir: logs/stacking/
 
-#data_directory: environments/dataset/data/stacking/joint_data
 
 train_data_path: environments/dataset/data/stacking/train_files.pkl
 eval_data_path: environments/dataset/data/stacking/eval_files.pkl
 
 # insert wandb here
 wandb:
-  entity: ???
-  project: ???
+  entity: atalaydonat
+  project: d3il
 
 group: stacking_${agent_name}
 
@@ -23,13 +21,6 @@ hydra:
   sweep:
     dir: ${log_dir}/sweeps/${agent_name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
     subdir: ${hydra.job.override_dirname}
-
-#  launcher:
-#    timeout_min: 2000
-#    name: stacking #${hydra.job.name}
-#    partition: accelerated
-##    gpus_per_node: 4
-#    additional_parameters: {"ntasks":1, "gres":gpu:4, "cpus-per-task":152}
 
 
 seed: 42
