@@ -1,19 +1,14 @@
 import logging
-import os
-import copy
 import multiprocessing as mp
-from multiprocessing import Process
+import os
 import random
+from envs.gym_avoiding_env.gym_avoiding.envs.avoiding import ObstacleAvoidanceEnv
 
 import numpy as np
 import torch
-import hydra
 import wandb
 
 from simulation.base_sim import BaseSim
-
-import gym
-import gym_avoiding
 
 log = logging.getLogger(__name__)
 
@@ -40,7 +35,7 @@ class Avoiding_Sim(BaseSim):
         print(os.getpid(), cpu_set)
         assign_process_to_cpu(os.getpid(), cpu_set)
 
-        env = gym.make('avoiding-v0')
+        env = ObstacleAvoidanceEnv(render=self.render)
         env.start()
 
         random.seed(pid)

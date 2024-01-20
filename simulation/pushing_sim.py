@@ -45,7 +45,7 @@ class Pushing_Sim(BaseSim):
         print(os.getpid(), cpu_set)
         assign_process_to_cpu(os.getpid(), cpu_set)
 
-        env = Block_Push_Env()
+        env = Block_Push_Env(render=self.render)
         env.start()
 
         random.seed(pid)
