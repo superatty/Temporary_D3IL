@@ -28,7 +28,7 @@ class PushObject(SimObject, MjXmlLoadable):
         else:
             assert len(quat) == 4, "Error, parameter quat has to be four dimensional."
 
-        self.obj_dir_path = "./models/mj/common-objects/aligning_box/" + file_name
+        self.obj_dir_path = "./models/mj/common-objects/robot_push_box/" + file_name
         self.root = root
         self.pos = pos
         self.quat = quat
@@ -49,7 +49,7 @@ class PushObject(SimObject, MjXmlLoadable):
 def get_obj_list():
 
     push_box = PushObject(
-        file_name="aligning_box.xml",
+        file_name="robot_push_box.xml",
         object_name="aligning_box",
         pos=box_pos,
         quat=box_quat

@@ -1,22 +1,17 @@
 import logging
 import os
-import copy
 
-from multiprocessing import Process
 import multiprocessing as mp
 import random
+from envs.gym_aligning_env.gym_aligning.envs.aligning import Robot_Push_Env
 
-import cv2
 import numpy as np
 import torch
-import hydra
 import wandb
 
 from simulation.base_sim import BaseSim
 from agents.utils.sim_path import sim_framework_path
 
-import gym
-import gym_aligning
 
 log = logging.getLogger(__name__)
 
@@ -53,7 +48,7 @@ class Aligning_Sim(BaseSim):
         print(os.getpid(), cpu_set)
         assign_process_to_cpu(os.getpid(), cpu_set)
 
-        env = gym.make('aligning-v0', render=self.render, if_vision=if_vision)
+        env = Robot_Push_Env(render=self.render)
         env.start()
 
         random.seed(pid)

@@ -5,18 +5,15 @@ import copy
 from gym.spaces import Box
 
 from environments.d3il.d3il_sim.utils.sim_path import d3il_path
-from environments.d3il.d3il_sim.controllers.Controller import ControllerBase
 from environments.d3il.d3il_sim.core import Scene
 from environments.d3il.d3il_sim.core.logger import ObjectLogger, CamLogger
 from environments.d3il.d3il_sim.gyms.gym_env_wrapper import GymEnvWrapper
-from environments.d3il.d3il_sim.gyms.gym_utils.helpers import obj_distance
 from environments.d3il.d3il_sim.utils.geometric_transformation import euler2quat
 
 from environments.d3il.d3il_sim.sims.mj_beta.MjRobot import MjRobot
 from environments.d3il.d3il_sim.sims.mj_beta.MjFactory import MjFactory
 from environments.d3il.d3il_sim.sims import MjCamera
 
-from environments.d3il.d3il_sim.gyms.gym_controllers import GymCartesianVelController
 from .objects.aligning_objects import get_obj_list, init_end_eff_pos
 
 obj_list = get_obj_list()
@@ -54,28 +51,6 @@ class BPCageCam(MjCamera):
             *args,
             **kwargs,
         )
-
-
-# class BPCageCam(MjCamera):
-#     """
-#     Cage camera. Extends the camera base class.
-#     """
-#
-#     def __init__(self, width: int = 1024, height: int = 1024, *args, **kwargs):
-#         super().__init__(
-#             "bp_cam",
-#             width,
-#             height,
-#             init_pos=[1.1, 0, 1.9],
-#             init_quat=[
-#                 0.6830127,
-#                 0.1830127,
-#                 0.1830127,
-#                 0.683012,
-#             ],  # Looking with 30 deg to the robot
-#             *args,
-#             **kwargs,
-#         )
 
 
 class BlockContextManager:
@@ -155,7 +130,7 @@ class Robot_Push_Env(GymEnvWrapper):
     def __init__(
         self,
         n_substeps: int = 35,
-        max_steps_per_episode: int = 2e3,
+        max_steps_per_episode: int = 400,
         debug: bool = False,
         random_env: bool = False,
         interactive: bool = False,
