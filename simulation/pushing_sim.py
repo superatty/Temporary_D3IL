@@ -1,21 +1,15 @@
 import logging
-import os
-import copy
-
-from multiprocessing import Process
 import multiprocessing as mp
+import os
 import random
 
 import numpy as np
 import torch
-import hydra
 import wandb
+from envs.gym_pushing_env.gym_pushing.envs.pushing import Block_Push_Env
 
-from simulation.base_sim import BaseSim
 from agents.utils.sim_path import sim_framework_path
-
-import gym
-import gym_pushing
+from simulation.base_sim import BaseSim
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +45,7 @@ class Pushing_Sim(BaseSim):
         print(os.getpid(), cpu_set)
         assign_process_to_cpu(os.getpid(), cpu_set)
 
-        env = gym.make('pushing-v0')
+        env = Block_Push_Env()
         env.start()
 
         random.seed(pid)
@@ -74,6 +68,9 @@ class Pushing_Sim(BaseSim):
                 pred_action = env.robot_state()
                 fixed_z = pred_action[2:]
                 done = False
+                
+                
+                
                 while not done:
 
                     obs = np.concatenate((pred_action[:2], obs))
