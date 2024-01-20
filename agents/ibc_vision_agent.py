@@ -474,7 +474,6 @@ class IBCAgent(BaseAgent):
         if self.use_ema:
             self.ema_helper.restore(self.model.parameters())
         torch.save(self.model.state_dict(), os.path.join(store_path, "non_ema_model_state_dict.pth"))
-
-
-if __name__ == "__main__":
-    print(1)
+        
+    def reset():
+        pass

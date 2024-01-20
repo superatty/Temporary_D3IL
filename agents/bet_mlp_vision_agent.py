@@ -518,3 +518,7 @@ class BetMLP_Agent(BaseAgent):
                 )
 
             return actions
+        
+    def reset(self):
+        """ Resets the context of the model."""
+        self.obs_context.clear()

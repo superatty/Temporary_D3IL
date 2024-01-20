@@ -325,3 +325,6 @@ class BCAgent(BaseAgent):
 
         model_pred = self.scaler.inverse_scale_output(out)
         return model_pred.detach().cpu().numpy()[0]
+    
+    def reset(self):
+        pass

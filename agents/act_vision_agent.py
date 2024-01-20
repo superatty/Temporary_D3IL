@@ -353,3 +353,7 @@ class ActAgent(BaseAgent):
         mean_kld = klds.mean(1).mean(0, True)
 
         return total_kld, dimension_wise_kld, mean_kld
+    
+    def reset(self):
+        """ Resets the context of the model."""
+        self.action_counter = self.action_seq_size

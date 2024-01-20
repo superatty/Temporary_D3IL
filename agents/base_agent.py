@@ -99,6 +99,13 @@ class BaseAgent(abc.ABC):
         Method for predicting one step with input data
         """
         pass
+    
+    @abc.abstractmethod
+    def reset(self) -> torch.Tensor:
+        """
+        Method for resetting the agent
+        """
+        pass
 
     def get_scaler(self, scaler: Scaler):
         self.scaler = scaler
