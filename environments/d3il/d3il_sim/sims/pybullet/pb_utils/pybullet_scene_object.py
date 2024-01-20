@@ -6,7 +6,7 @@ import pybullet as p
 from environments.d3il.d3il_sim.core.sim_object.sim_object import SimObject
 from environments.d3il.d3il_sim.sims.pybullet.PybulletLoadable import PybulletLoadable
 from environments.d3il.d3il_sim.utils.geometric_transformation import euler2quat, wxyz_to_xyzw
-from environments.d3il.d3il_sim.utils.sim_path import sim_framework_path
+from environments.d3il.d3il_sim.utils.sim_path import d3il_path
 
 
 class PyBulletURDFObject(SimObject, PybulletLoadable):
@@ -28,7 +28,7 @@ class PyBulletURDFObject(SimObject, PybulletLoadable):
         super().__init__(object_name, position, init_quat)
 
         if data_dir is None:
-            data_dir = sim_framework_path("./models/pybullet/objects/")
+            data_dir = d3il_path("./models/pybullet/objects/")
 
         objects = os.listdir(data_dir)
 

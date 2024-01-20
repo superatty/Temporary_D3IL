@@ -5,7 +5,7 @@ import numpy as np
 from environments.d3il.d3il_sim.core import logger
 from environments.d3il.d3il_sim.sims.mujoco.MujocoRobot import MujocoRobot
 from environments.d3il.d3il_sim.sims.universal_sim.PrimitiveObjects import Box
-from environments.d3il.d3il_sim.utils.sim_path import sim_framework_path
+from environments.d3il.d3il_sim.utils.sim_path import d3il_path
 
 
 class InteractiveMujocoRobot(MujocoRobot):
@@ -46,7 +46,7 @@ class InteractiveMujocoRobot(MujocoRobot):
 
     @property
     def xml_file_path(self):
-        return sim_framework_path("./models/mujoco/robots/panda.xml")
+        return d3il_path("./models/mujoco/robots/panda.xml")
 
     def _read_tcp(self):
         """

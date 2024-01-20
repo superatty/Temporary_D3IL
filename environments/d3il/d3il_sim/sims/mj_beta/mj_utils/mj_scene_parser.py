@@ -7,7 +7,7 @@ import mujoco
 from environments.d3il.d3il_sim.sims.mj_beta.mj_utils.mj_helper import IncludeType
 from environments.d3il.d3il_sim.sims.mj_beta.mj_utils.mj_scene_object import MjSurrounding
 from environments.d3il.d3il_sim.sims.mj_beta.MjLoadable import MjLoadable, MjIncludeTemplate
-from environments.d3il.d3il_sim.utils.sim_path import sim_framework_path
+from environments.d3il.d3il_sim.utils.sim_path import d3il_path
 
 
 class MjSceneParser:
@@ -20,7 +20,7 @@ class MjSceneParser:
         if main_xml_path is None:
             main_xml_path = "./models/mj/surroundings/base.xml"
 
-        with open(sim_framework_path(main_xml_path), "r") as file:
+        with open(d3il_path(main_xml_path), "r") as file:
             self.scene_xml = file.read()
 
         # file and assets collections

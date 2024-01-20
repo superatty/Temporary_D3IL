@@ -4,7 +4,7 @@ import copy
 
 from gym.spaces import Box
 
-from environments.d3il.d3il_sim.utils.sim_path import sim_framework_path
+from environments.d3il.d3il_sim.utils.sim_path import d3il_path
 from environments.d3il.d3il_sim.controllers.Controller import ControllerBase
 from environments.d3il.d3il_sim.core import Scene
 from environments.d3il.d3il_sim.core.logger import ObjectLogger, CamLogger
@@ -170,7 +170,7 @@ class Robot_Push_Env(GymEnvWrapper):
         )
         robot = MjRobot(
             scene,
-            xml_path=sim_framework_path("./models/mj/robot/panda_rod.xml"),
+            xml_path=d3il_path("./models/mj/robot/panda_rod.xml"),
         )
         controller = robot.cartesianPosQuatTrackingController
 

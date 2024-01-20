@@ -4,7 +4,7 @@ from pathlib import Path
 import time
 
 import matplotlib.pyplot as plt
-from d3il_sim.utils.sim_path import sim_framework_path
+from d3il_sim.utils.sim_path import d3il_path
 from gamepad_control.logger.logger import Logger as data_logger
 from gamepad_control.src import tcp_control
 
@@ -15,7 +15,7 @@ arg_parser.add_argument("-t", "--task", type=str, required=True, help="name of t
 args = arg_parser.parse_args()
 task = args.task
 
-sv_dir = sim_framework_path("../dataset/data", task, "recorded_data")
+sv_dir = d3il_path("../dataset/data", task, "recorded_data")
 print(sv_dir)
 Path(sv_dir).mkdir(parents=True, exist_ok=True)
 

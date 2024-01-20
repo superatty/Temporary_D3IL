@@ -32,13 +32,13 @@ class MjRobot(RobotBase, MjIncludeTemplate):
         base_orientation=None,
         gravity_comp=True,
         clip_actions=False,
-        root=sim_path.FRAMEWORK_DIR,
+        root=sim_path.D3IL_DIR,
         xml_path=None,
     ):
         RobotBase.__init__(self, scene, dt, num_DoF, base_position, base_orientation)
 
         if xml_path is None:
-            xml_path = sim_path.sim_framework_path("./models/mj/robot/panda.xml")
+            xml_path = sim_path.d3il_path("./models/mj/robot/panda.xml")
         MjXmlLoadable.__init__(self, xml_path)
 
         self.clip_actions = clip_actions
@@ -327,7 +327,7 @@ class MjRobot(RobotBase, MjIncludeTemplate):
 
         import uuid
 
-        new_path = sim_path.sim_framework_path(
+        new_path = sim_path.d3il_path(
             f"./models/mj/robot/panda_tmp_rb{self._mj_robot_id}_{uuid.uuid1()}.xml"
         )
         et.write(new_path)

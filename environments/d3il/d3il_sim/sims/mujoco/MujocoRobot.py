@@ -14,7 +14,7 @@ from environments.d3il.d3il_sim.core import RobotBase, RobotControlInterface
 from environments.d3il.d3il_sim.sims.mujoco.mj_utils.mujoco_helpers import reset_mocap2body_xpos
 from environments.d3il.d3il_sim.sims.mujoco.MujocoCamera import MjInhandCamera
 from environments.d3il.d3il_sim.sims.mujoco.MujocoLoadable import MujocoIncludeTemplate
-from environments.d3il.d3il_sim.utils.sim_path import sim_framework_path
+from environments.d3il.d3il_sim.utils.sim_path import d3il_path
 
 
 class MujocoRobot(RobotBase, MujocoIncludeTemplate):
@@ -57,7 +57,7 @@ class MujocoRobot(RobotBase, MujocoIncludeTemplate):
         self.inhand_cam = MjInhandCamera(self.add_id2model_key("rgbd"))
 
         if xml_path is None:
-            xml_path = sim_framework_path("./models/mujoco/robots/panda_rod.xml")
+            xml_path = d3il_path("./models/mujoco/robots/panda_rod.xml")
         self._xml_path = xml_path
 
     def _getJacobian_internal(self, q=None):
@@ -347,7 +347,7 @@ class MujocoRobot(RobotBase, MujocoIncludeTemplate):
 
         import uuid
 
-        new_path = sim_framework_path(
+        new_path = d3il_path(
             # <<<<<<< HEAD
             "./models/mujoco/robots/panda_tmp_rb{}.xml".format(self._mj_robot_id)
             # =======
@@ -441,4 +441,4 @@ class MujocoMocapRobot(MujocoRobot):
 
     @property
     def xml_file_path(self):
-        return sim_framework_path("./models/mujoco/robots/panda_mocap.xml")
+        return d3il_path("./models/mujoco/robots/panda_mocap.xml")

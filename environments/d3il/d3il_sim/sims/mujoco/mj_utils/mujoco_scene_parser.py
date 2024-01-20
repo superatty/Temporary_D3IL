@@ -7,7 +7,7 @@ from mujoco_py import MjSim, load_model_from_path
 
 from environments.d3il.d3il_sim.sims.mujoco.mj_utils.mujoco_scene_object import MujocoSurrounding
 from environments.d3il.d3il_sim.sims.mujoco.MujocoLoadable import MujocoIncludeTemplate, MujocoLoadable
-from environments.d3il.d3il_sim.utils.sim_path import sim_framework_path
+from environments.d3il.d3il_sim.utils.sim_path import d3il_path
 
 
 class MujocoSceneParser:
@@ -19,11 +19,11 @@ class MujocoSceneParser:
     def __init__(self, main_xml_path=None, proc_id=""):
         if main_xml_path is None:
             main_xml_path = "./models/mujoco/surroundings/base.xml"
-        src = sim_framework_path(main_xml_path)
-        self._xml_path = sim_framework_path(
+        src = d3il_path(main_xml_path)
+        self._xml_path = d3il_path(
             "./models/mujoco/surroundings/"
         )  # Need Directory for XML-Include
-        self.scene_xml = sim_framework_path(
+        self.scene_xml = d3il_path(
             self._xml_path, "{}assembled_scene.xml".format(proc_id)
         )  # Full Path
         copyfile(src, self.scene_xml)

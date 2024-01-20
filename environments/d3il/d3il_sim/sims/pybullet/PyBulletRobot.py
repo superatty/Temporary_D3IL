@@ -6,7 +6,7 @@ import pybullet
 from environments.d3il.d3il_sim.core import RobotBase
 from environments.d3il.d3il_sim.sims.pybullet.PybulletCamera import PbInHandCamera
 from environments.d3il.d3il_sim.utils.geometric_transformation import wxyz_to_xyzw
-from environments.d3il.d3il_sim.utils.sim_path import sim_framework_path
+from environments.d3il.d3il_sim.utils.sim_path import d3il_path
 
 
 class PyBulletRobot(RobotBase):
@@ -43,7 +43,7 @@ class PyBulletRobot(RobotBase):
         self.physics_client_id = None
 
         if path_to_urdf is None:
-            path_to_urdf = sim_framework_path(
+            path_to_urdf = d3il_path(
                 "./models/pybullet/robots/panda_arm_hand.urdf"
             )
         self.path_to_urdf = path_to_urdf

@@ -6,7 +6,7 @@ import sys
 
 from gym.spaces import Box
 
-from d3il_sim.utils.sim_path import sim_framework_path
+from d3il_sim.utils.sim_path import d3il_path
 from d3il_sim.controllers.Controller import ControllerBase
 from d3il_sim.core import Scene
 from d3il_sim.core.logger import ObjectLogger, CamLogger
@@ -169,7 +169,7 @@ class Gate_Insertion_Env(GymEnvWrapper):
         )
         robot = MjRobot(
             scene,
-            xml_path=sim_framework_path("./models/mj/robot/panda_rod.xml"),
+            xml_path=d3il_path("./models/mj/robot/panda_rod.xml"),
         )
         controller = robot.cartesianPosQuatTrackingController
         # controller = robot.jointTrackingController

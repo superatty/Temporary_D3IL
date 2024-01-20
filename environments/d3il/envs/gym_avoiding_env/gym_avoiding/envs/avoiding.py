@@ -1,7 +1,7 @@
 import numpy as np
 import copy
 from environments.d3il.d3il_sim.sims.mj_beta.mj_utils.mj_helper import has_collision
-from environments.d3il.d3il_sim.utils.sim_path import sim_framework_path
+from environments.d3il.d3il_sim.utils.sim_path import d3il_path
 
 from environments.d3il.d3il_sim.core import Scene
 from environments.d3il.d3il_sim.gyms.gym_env_wrapper import GymEnvWrapper
@@ -65,7 +65,7 @@ class ObstacleAvoidanceEnv(GymEnvWrapper):
         )
         robot = MjRobot(
             scene,
-            xml_path=sim_framework_path("./models/mj/robot/panda_rod.xml")
+            xml_path=d3il_path("./models/mj/robot/panda_rod.xml")
         )
         controller = robot.cartesianPosQuatTrackingController
 

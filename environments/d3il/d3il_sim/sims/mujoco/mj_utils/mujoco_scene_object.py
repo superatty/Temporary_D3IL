@@ -8,7 +8,7 @@ from environments.d3il.d3il_sim.utils import sim_path
 
 class MujocoObject(mj_load.MujocoLoadable):
     def __init__(
-        self, object_name, pos, quat, root=sim_path.FRAMEWORK_DIR, obj_path=None
+        self, object_name, pos, quat, root=sim_path.D3IL_DIR, obj_path=None
     ):
 
         if pos is None:
@@ -59,7 +59,7 @@ class MujocoWorkspace(mj_load.MujocoXmlLoadable):
 
     @property
     def xml_file_path(self):
-        return sim_path.sim_framework_path(
+        return sim_path.d3il_path(
             "./envs/mujoco/assets/workspace/{}_workspace.xml".format(self.size)
         )
 

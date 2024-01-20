@@ -1,10 +1,8 @@
-from typing import List, Optional, Tuple
-
 import gin
 
 import environments.d3il.d3il_sim.sims.SimFactory as Sims
 from environments.d3il.d3il_sim.core import Camera, RobotBase, Scene
-from environments.d3il.d3il_sim.utils.sim_path import sim_framework_path
+from environments.d3il.d3il_sim.utils.sim_path import d3il_path
 
 from .MjCamera import MjCamera
 from .MjPrimLoader import mj_load
@@ -24,8 +22,8 @@ class MjFactory(Sims.SimFactory):
     ) -> Scene:
 
         if gin_path is None:
-            gin_path = sim_framework_path(
-                "./environments.d3il.d3il_sim/controllers/Config/mujoco_controller_config.gin"
+            gin_path = d3il_path(
+                "d3il_sim/controllers/Config/mujoco_controller_config.gin"
             )
         gin.parse_config_file(gin_path)
         return MjScene(object_list, dt, render, *args, **kwargs)

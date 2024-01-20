@@ -11,7 +11,7 @@ from environments.d3il.d3il_sim.utils import sim_path
 
 
 class MujocoObject(mj_load.MjXmlLoadable):
-    def __init__(self, object_name, pos, quat, root=sim_path.FRAMEWORK_DIR):
+    def __init__(self, object_name, pos, quat, root=sim_path.D3IL_DIR):
         if pos is None:
             pos = [0, 0, 0]
         else:
@@ -207,7 +207,7 @@ class YCBMujocoObject(CompositeMujocoObject):
 
 class CustomMujocoObject(mj_load.MjXmlLoadable):
     def __init__(
-        self, object_name, object_dir_path, pos, quat, root=sim_path.FRAMEWORK_DIR
+        self, object_name, object_dir_path, pos, quat, root=sim_path.D3IL_DIR
     ):
         if pos is None:
             pos = [0, 0, 0]
@@ -262,7 +262,7 @@ class CustomMujocoObject(mj_load.MjXmlLoadable):
 
 
 class MjWorkspace(mj_load.MjXmlLoadable):
-    def __init__(self, size: str, root=sim_path.FRAMEWORK_DIR):
+    def __init__(self, size: str, root=sim_path.D3IL_DIR):
         if size not in ["small", "medium", "large"]:
             raise ValueError(
                 "Error, please choose a size between <small>, <medium> or <large> ."
@@ -278,7 +278,7 @@ class MjSurrounding(mj_load.MjXmlLoadable):
     def __init__(self, surrounding_name, root=None):
         self.surrounding_name = surrounding_name
         if root is None:
-            root = os.path.join(sim_path.FRAMEWORK_DIR, "./models/mj/surroundings")
+            root = os.path.join(sim_path.D3IL_DIR, "./models/mj/surroundings")
         self.root = root
 
         super().__init__(os.path.join(root, "{}.xml".format(self.surrounding_name)))

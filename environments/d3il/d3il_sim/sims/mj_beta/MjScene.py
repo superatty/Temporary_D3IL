@@ -42,7 +42,7 @@ class MjScene(Scene):
         self.random_env = random_env
 
         if surrounding is None:
-            surrounding = sim_path.sim_framework_path(
+            surrounding = sim_path.d3il_path(
                 "./models/mujoco/surroundings/lab_surrounding.xml"
             )
 

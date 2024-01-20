@@ -5,7 +5,7 @@ from environments.d3il.d3il_sim.core import Camera, RobotBase, Scene
 from environments.d3il.d3il_sim.sims.sl.SlCamera import SlCamera
 from environments.d3il.d3il_sim.sims.sl.SlRobot import SlRobot
 from environments.d3il.d3il_sim.sims.sl.SlScene import SlScene
-from environments.d3il.d3il_sim.utils.sim_path import sim_framework_path
+from environments.d3il.d3il_sim.utils.sim_path import d3il_path
 
 
 class SlFactory(Sims.SimFactory):
@@ -19,8 +19,8 @@ class SlFactory(Sims.SimFactory):
         **kwargs
     ) -> Scene:
         if gin_path is None:
-            gin_path = sim_framework_path(
-                "environments.d3il.d3il_sim/sims/sl/Config/sl_controller_config.gin"
+            gin_path = d3il_path(
+                "d3il_sim/sims/sl/Config/sl_controller_config.gin"
             )
         gin.parse_config_file(gin_path)
         return SlScene(object_list=object_list, dt=dt, render=render, *args, **kwargs)

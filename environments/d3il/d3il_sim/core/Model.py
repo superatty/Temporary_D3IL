@@ -1,7 +1,7 @@
 import numpy as np
 import pinocchio
 
-from environments.d3il.d3il_sim.utils.sim_path import sim_framework_path
+from environments.d3il.d3il_sim.utils.sim_path import d3il_path
 
 
 class RobotKinematicsInterface:
@@ -25,7 +25,7 @@ class RobotDynamicsInterface:
 
 class RobotModelFromPinochio(RobotKinematicsInterface, RobotDynamicsInterface):
     def __init__(self, obj_urdf="./models/common/robots/panda_arm_hand_pinocchio.urdf"):
-        obj_urdf = sim_framework_path(obj_urdf)
+        obj_urdf = d3il_path(obj_urdf)
         self.pin_model = pinocchio.buildModelFromUrdf(obj_urdf)
         self.pin_data = self.pin_model.createData()
 

@@ -3,7 +3,7 @@ import os.path
 import imageio
 import mujoco_py
 
-from environments.d3il.d3il_sim.utils.sim_path import sim_framework_path
+from environments.d3il.d3il_sim.utils.sim_path import d3il_path
 
 
 class MujocoViewer:
@@ -67,7 +67,7 @@ class MujocoViewer:
         self.viewer.cam.elevation = elevation
 
     def save_video(self):
-        fname = sim_framework_path("videos", self.get_file_name())
+        fname = d3il_path("videos", self.get_file_name())
         writer = imageio.get_writer(fname, fps=self.fps)
         for f in self.frames:
             writer.append_data(f)
@@ -87,11 +87,11 @@ class MujocoViewer:
 
     @staticmethod
     def get_file_name():
-        if not os.path.exists(sim_framework_path("videos")):
-            os.mkdir(sim_framework_path("videos"))
+        if not os.path.exists(d3il_path("videos")):
+            os.mkdir(d3il_path("videos"))
             return "vid_0.mp4"
         else:
-            vids = os.listdir(sim_framework_path("videos"))
+            vids = os.listdir(d3il_path("videos"))
             nums = [int(v.split("vid_")[1].split(".")[0]) for v in vids if "vid_" in v]
             num = max(nums) + 1 if nums.__len__() > 0 else 0
             return "vid_" + str(num) + ".mp4"

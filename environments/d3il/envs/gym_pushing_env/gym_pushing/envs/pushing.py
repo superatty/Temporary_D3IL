@@ -6,8 +6,7 @@ import sys
 
 from gym.spaces import Box
 
-from environments.d3il.d3il_sim.utils.sim_path import sim_framework_path
-from environments.d3il.d3il_sim.controllers.Controller import ControllerBase
+from environments.d3il.d3il_sim.utils.sim_path import d3il_path
 from environments.d3il.d3il_sim.core import Scene
 from environments.d3il.d3il_sim.core.logger import ObjectLogger, CamLogger
 from environments.d3il.d3il_sim.gyms.gym_env_wrapper import GymEnvWrapper
@@ -18,8 +17,7 @@ from environments.d3il.d3il_sim.sims.mj_beta.MjRobot import MjRobot
 from environments.d3il.d3il_sim.sims.mj_beta.MjFactory import MjFactory
 from environments.d3il.d3il_sim.sims import MjCamera
 
-from environments.d3il.d3il_sim.gyms.gym_controllers import GymCartesianVelController
-from .objects.bp_objects import get_obj_list, init_end_eff_pos
+from .objects.pushing_objects import get_obj_list, init_end_eff_pos
 
 obj_list, push_box1, push_box2, target_box_1, target_box_2 = get_obj_list()
 
@@ -174,7 +172,7 @@ class Block_Push_Env(GymEnvWrapper):
     def __init__(
         self,
         n_substeps: int = 35,
-        max_steps_per_episode: int = 2e3,
+        max_steps_per_episode: int = 400,
         debug: bool = False,
         random_env: bool = False,
         interactive: bool = False,
@@ -188,7 +186,7 @@ class Block_Push_Env(GymEnvWrapper):
         )
         robot = MjRobot(
             scene,
-            xml_path=sim_framework_path("./models/mj/robot/panda_rod_invisible.xml"),
+            xml_path=d3il_path("./models/mj/robot/panda_rod_invisible.xml"),
         )
         controller = robot.cartesianPosQuatTrackingController
         # controller = robot.jointTrackingController

@@ -11,7 +11,7 @@ from environments.d3il.d3il_sim.core.sim_object import IntelligentSimObject, Sim
 from environments.d3il.d3il_sim.sims.pybullet.PybulletCamera import PbCageCam
 from environments.d3il.d3il_sim.sims.pybullet.PybulletLoadable import PybulletLoadable
 from environments.d3il.d3il_sim.utils.geometric_transformation import wxyz_to_xyzw, xyzw_to_wxyz
-from environments.d3il.d3il_sim.utils.sim_path import sim_framework_path
+from environments.d3il.d3il_sim.utils.sim_path import d3il_path
 
 PYBULLET = "pybullet"
 
@@ -76,12 +76,12 @@ class PyBulletScene(Scene):
     def _setup_scene(self):
         # load surroundings
         p.loadURDF(
-            sim_framework_path("./models/pybullet/objects/plane/plane.urdf"),
+            d3il_path("./models/pybullet/objects/plane/plane.urdf"),
             physicsClientId=self.physics_client_id,
             basePosition=[0, 0, -0.94],
         )
         p.loadURDF(
-            sim_framework_path("./models/pybullet/objects/plane/plane.urdf"),
+            d3il_path("./models/pybullet/objects/plane/plane.urdf"),
             physicsClientId=self.ik_client_id,
             basePosition=[0, 0, -0.94],
         )
@@ -90,7 +90,7 @@ class PyBulletScene(Scene):
         table_start_orientation = [0.0, 0.0, 0.0]
         table_start_orientation_quat = p.getQuaternionFromEuler(table_start_orientation)
         p.loadURDF(
-            sim_framework_path(
+            d3il_path(
                 "./models/pybullet/surroundings/lab_surrounding.urdf"
             ),
             table_start_position,

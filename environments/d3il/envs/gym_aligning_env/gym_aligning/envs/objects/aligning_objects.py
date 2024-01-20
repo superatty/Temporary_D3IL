@@ -17,7 +17,7 @@ box_quat = [1, 0, 0, 0]
 
 
 class PushObject(SimObject, MjXmlLoadable):
-    def __init__(self, file_name, object_name, pos, quat, root=sim_path.FRAMEWORK_DIR):
+    def __init__(self, file_name, object_name, pos, quat, root=sim_path.D3IL_DIR):
         if pos is None:
             pos = [0, 0, 0]
         else:
