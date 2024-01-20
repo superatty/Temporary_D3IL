@@ -1,22 +1,16 @@
 import logging
 import os
-import copy
 
-from multiprocessing import Process
 import multiprocessing as mp
 import random
 
-import cv2
+from envs.gym_sorting_env.gym_sorting.envs.sorting import Sorting_Env
 import numpy as np
 import torch
-import hydra
 import wandb
 
 from simulation.base_sim import BaseSim
 from agents.utils.sim_path import sim_framework_path
-
-import gym
-import gym_sorting
 
 log = logging.getLogger(__name__)
 
@@ -67,7 +61,7 @@ class Sorting_Sim(BaseSim):
         print(os.getpid(), cpu_set)
         assign_process_to_cpu(os.getpid(), cpu_set)
 
-        env = gym.make('sorting-v0', max_steps_per_episode=self.max_steps_per_episode, render=self.render, num_boxes=self.num_box, if_vision=if_vision)
+        env = Sorting_Env(max_steps_per_episode=self.max_steps_per_episode, render=self.render, num_boxes=self.num_box, if_vision=if_vision)
         env.start()
 
         random.seed(pid)

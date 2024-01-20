@@ -3,16 +3,13 @@ import random
 import cv2
 import numpy as np
 import copy
-import time
 
 from gym.spaces import Box
 
 from environments.d3il.d3il_sim.utils.sim_path import d3il_path
-from environments.d3il.d3il_sim.controllers.Controller import ControllerBase
 from environments.d3il.d3il_sim.core import Scene
 from environments.d3il.d3il_sim.core.logger import ObjectLogger, CamLogger
 from environments.d3il.d3il_sim.gyms.gym_env_wrapper import GymEnvWrapper
-from environments.d3il.d3il_sim.gyms.gym_utils.helpers import obj_distance
 from environments.d3il.d3il_sim.utils.geometric_transformation import euler2quat, quat2euler
 
 from environments.d3il.d3il_sim.sims.mj_beta.MjRobot import MjRobot
