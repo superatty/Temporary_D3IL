@@ -45,7 +45,7 @@ pip install wandb
 
 ############ MUJOCO BETA SUPPORT INSTALLATION ############
 mamba install -c conda-forge imageio -y -q
-pip install mujoco
+pip install mujoco==2.3.2
 
 ############ INSTALL D3il-Sim & FINALIZE ############
 echo
