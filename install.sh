@@ -42,6 +42,7 @@ mamba install -c open3d-admin open3d -y -q
 pip install einops
 pip install hydra-core==1.1.1
 pip install wandb
+pip install termcolor
 
 ############ MUJOCO BETA SUPPORT INSTALLATION ############
 mamba install -c conda-forge imageio -y -q
