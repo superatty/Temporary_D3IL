@@ -169,5 +169,5 @@ class CVAEAgent(BaseAgent):
         model_pred = self.scaler.inverse_scale_output(out)
         return model_pred.detach().cpu().numpy()
 
-    def reset():
+    def reset(self):
         pass

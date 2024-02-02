@@ -298,5 +298,5 @@ class BCAgent(BaseAgent):
         else:
             torch.save(self.model.module.state_dict(), os.path.join(store_path, sv_name))
             
-    def reset():
+    def reset(self):
         pass
