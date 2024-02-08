@@ -42,7 +42,15 @@ mamba install -c open3d-admin open3d -y -q
 pip install einops
 pip install hydra-core==1.1.1
 pip install wandb
+
+# Robomimic
 pip install termcolor
+
+# ACT
+pip install ipython
+
+# BESO
+pip install torchsde torchdiffeq
 
 ############ MUJOCO BETA SUPPORT INSTALLATION ############
 mamba install -c conda-forge imageio -y -q

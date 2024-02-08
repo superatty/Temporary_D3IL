@@ -1,4 +1,3 @@
-from faulthandler import disable
 from functools import partial
 import os
 import logging
@@ -9,8 +8,6 @@ import einops
 from omegaconf import DictConfig
 import hydra
 import torch
-import torch.nn as nn
-import numpy as np
 from tqdm import tqdm
 import wandb
 
@@ -19,7 +16,6 @@ from agents.base_agent import BaseAgent
 from agents.models.beso.networks.ema_helper.ema import ExponentialMovingAverage
 from agents.models.beso.agents.diffusion_agents.k_diffusion.gc_sampling import *
 import agents.models.beso.agents.diffusion_agents.k_diffusion.utils as utils
-from agents.models.beso.agents.diffusion_agents.k_diffusion.score_gpts import DiffusionGPT
 
 # A logger for this file
 log = logging.getLogger(__name__)
