@@ -286,9 +286,9 @@ class Gpt_Agent(BaseAgent):
         """
 
         if sv_name is None:
-            self.model.module.load_state_dict(torch.load(os.path.join(weights_path, "model_state_dict.pth")))
+            self.model.load_state_dict(torch.load(os.path.join(weights_path, "model_state_dict.pth")))
         else:
-            self.model.module.load_state_dict(torch.load(os.path.join(weights_path, sv_name)))
+            self.model.load_state_dict(torch.load(os.path.join(weights_path, sv_name)))
         log.info('Loaded pre-trained model parameters')
 
     def store_model_weights(self, store_path: str, sv_name=None) -> None:
