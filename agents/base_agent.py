@@ -72,10 +72,24 @@ class BaseAgent(abc.ABC):
 
         log.info("The model has a total amount of {} parameters".format(total_params))
 
+    def train(self):
+
+        if self.model.visual_input:
+            self.train_vision_agent()
+        else:
+            self.train_agent()
+            
     @abc.abstractmethod
     def train_agent(self):
         """
         Main method to train the agent on the given train and test data
+        """
+        pass
+     
+    @abc.abstractmethod
+    def train_vision_agent(self):
+        """
+        Main method to train the vision agent on the given train and test data
         """
         pass
 

@@ -1,4 +1,5 @@
 import logging
+import os
 
 import torch
 import torch.nn as nn
@@ -14,7 +15,7 @@ from agents.base_agent import BaseAgent
 log = logging.getLogger(__name__)
 
 
-class BCPolicy(nn.Module):
+class BC_Policy(nn.Module):
 
     def __init__(self,
                  model: DictConfig,
@@ -22,7 +23,7 @@ class BCPolicy(nn.Module):
                  visual_input: bool = False,
                  device: str = 'cpu'):
 
-        super(BCPolicy, self).__init__()
+        super(BC_Policy, self).__init__()
 
         self.visual_input = visual_input
 
@@ -68,7 +69,7 @@ class BCPolicy(nn.Module):
         return self.parameters()
 
 
-class BCAgent(BaseAgent):
+class BC_Agent(BaseAgent):
     def __init__(
             self,
             model: DictConfig,
@@ -87,8 +88,16 @@ class BCAgent(BaseAgent):
                          val_batch_size=val_batch_size, num_workers=num_workers, device=device,
                          epoch=epoch, scale_data=scale_data, eval_every_n_epochs=eval_every_n_epochs)
 
+        # Define the number of GPUs available
+        num_gpus = torch.cuda.device_count()
+
+        # Check if multiple GPUs are available and select the appropriate device
+        if num_gpus > 1:
+            print(f"Using {num_gpus} GPUs for training.")
+            self.model = nn.DataParallel(self.model)
+
         self.optimizer = hydra.utils.instantiate(
-            optimization, params=self.model.get_params()
+            optimization, params=self.model.parameters()
         )
 
         self.eval_model_name = "eval_best_bc.pth"
@@ -96,13 +105,6 @@ class BCAgent(BaseAgent):
 
         self.min_action = torch.from_numpy(self.scaler.y_bounds[0, :]).to(self.device)
         self.max_action = torch.from_numpy(self.scaler.y_bounds[1, :]).to(self.device)
-
-    def train(self):
-
-        if self.model.visual_input:
-            self.train_vision_agent()
-        else:
-            self.train_agent()
 
     def train_agent(self):
         best_test_mse = 1e10
@@ -173,87 +175,29 @@ class BCAgent(BaseAgent):
         log.info("Training done!")
 
     def train_vision_agent(self):
-        best_test_mse = 1e10
 
-        for num_epoch in tqdm(range(self.epoch)):
+        train_loss = []
+        for data in self.train_dataloader:
+            bp_imgs, inhand_imgs, obs, action, mask = data
+            # obs, action, mask = data
 
-            if not (num_epoch+1) % self.eval_every_n_epochs:
+            bp_imgs = bp_imgs.to(self.device)
+            inhand_imgs = inhand_imgs.to(self.device)
 
-                test_mse = []
-                for data in self.test_dataloader:
+            obs = self.scaler.scale_input(obs)
+            action = self.scaler.scale_output(action)
 
-                    bp_imgs, inhand_imgs, obs, action, mask = data
+            state = (bp_imgs, inhand_imgs, obs)
 
-                    # obs, action, mask = data
+            batch_loss = self.train_step(state, action)
 
-                    bp_imgs = bp_imgs.to(self.device)
-                    inhand_imgs = inhand_imgs.to(self.device)
+            train_loss.append(batch_loss)
 
-                    obs = self.scaler.scale_input(obs)
-                    action = self.scaler.scale_output(action)
-
-                    state = (bp_imgs, inhand_imgs, obs)
-
-                    mean_mse = self.evaluate(state, action)
-                    test_mse.append(mean_mse)
-
-                    wandb.log(
-                        {
-                            "test_loss": mean_mse,
-                        }
-                    )
-
-                avrg_test_mse = sum(test_mse) / len(test_mse)
-
-                log.info("Epoch {}: Mean test mse is {}".format(num_epoch, avrg_test_mse))
-
-                if avrg_test_mse < best_test_mse:
-                    best_test_mse = avrg_test_mse
-                    self.store_model_weights(self.working_dir, sv_name=self.eval_model_name)
-
-                    wandb.log(
-                        {
-                            "best_model_epochs": num_epoch
-                        }
-                    )
-
-                    log.info('New best test loss. Stored weights have been updated!')
-
-                wandb.log(
-                    {
-                        "mean_test_loss": avrg_test_mse,
-                    }
-                )
-
-            train_loss = []
-            for data in self.train_dataloader:
-                bp_imgs, inhand_imgs, obs, action, mask = data
-                # obs, action, mask = data
-
-                bp_imgs = bp_imgs.to(self.device)
-                inhand_imgs = inhand_imgs.to(self.device)
-
-                obs = self.scaler.scale_input(obs)
-                action = self.scaler.scale_output(action)
-
-                state = (bp_imgs, inhand_imgs, obs)
-
-                batch_loss = self.train_step(state, action)
-
-                train_loss.append(batch_loss)
-
-                wandb.log(
-                    {
-                        "loss": batch_loss,
-                    }
-                )
-
-            avrg_train_loss = sum(train_loss) / len(train_loss)
-            log.info("Epoch {}: Average train loss is {}".format(num_epoch, avrg_train_loss))
-
-        self.store_model_weights(self.working_dir, sv_name=self.last_model_name)
-
-        log.info("Training done!")
+            wandb.log(
+                {
+                    "loss": batch_loss,
+                }
+            )
 
     def train_step(self, state, actions: torch.Tensor, goal: Optional[torch.Tensor] = None):
         """
@@ -325,6 +269,27 @@ class BCAgent(BaseAgent):
 
         model_pred = self.scaler.inverse_scale_output(out)
         return model_pred.detach().cpu().numpy()[0]
-    
+
+    def load_pretrained_model(self, weights_path: str, sv_name=None) -> None:
+        """
+        Method to load a pretrained model weights inside self.model
+        """
+
+        if sv_name is None:
+            self.model.load_state_dict(torch.load(os.path.join(weights_path, "model_state_dict.pth")))
+        else:
+            self.model.load_state_dict(torch.load(os.path.join(weights_path, sv_name)))
+        log.info('Loaded pre-trained model parameters')
+
+    def store_model_weights(self, store_path: str, sv_name=None) -> None:
+        """
+        Store the model weights inside the store path as model_weights.pth
+        """
+
+        if sv_name is None:
+            torch.save(self.model.state_dict(), os.path.join(store_path, "model_state_dict.pth"))
+        else:
+            torch.save(self.model.state_dict(), os.path.join(store_path, sv_name))
+            
     def reset(self):
         pass

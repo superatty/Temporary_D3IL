@@ -21,11 +21,6 @@ model:
     norm_style: 'BatchNorm'
     device: ${device}
 
-#  obs_encoder:
-#    _target_: agents.models.common.agent_attention_encoder.AgentAttEncoder
-#    shape_meta: ${shape_meta}
-#    dim_embedding: 128
-
   obs_encoder:
     _target_: torch.nn.Identity
     output_dim: ${obs_dim}
@@ -33,24 +28,10 @@ model:
 trainset: ${trainset}
 valset: ${valset}
 
-#optimization:
-#  _target_: torch.optim.AdamW
-#  lr: 1.0e-3
-#  betas: [0.9, 0.995]
-#  eps: 1.0e-8
-#  weight_decay: 0.1
-
 optimization:
   _target_: torch.optim.Adam
   lr: 1e-3
   weight_decay: 0
-
-#optimization:
-#  _target_: torch.optim.AdamW
-#  lr: 1.0e-4
-#  betas: [0.95, 0.999]
-#  eps: 1.0e-8
-#  weight_decay: 1.0e-6
 
 train_batch_size: ${train_batch_size}
 val_batch_size: ${val_batch_size}
