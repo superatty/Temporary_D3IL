@@ -294,9 +294,9 @@ class BCAgent(BaseAgent):
         """
 
         if sv_name is None:
-            torch.save(self.model.module.state_dict(), os.path.join(store_path, "model_state_dict.pth"))
+            torch.save(self.model.state_dict(), os.path.join(store_path, "model_state_dict.pth"))
         else:
-            torch.save(self.model.module.state_dict(), os.path.join(store_path, sv_name))
+            torch.save(self.model.state_dict(), os.path.join(store_path, sv_name))
             
     def reset(self):
         pass

@@ -43,12 +43,12 @@ class Aligning_Sim(BaseSim):
         self.n_contexts = n_contexts
         self.n_trajectories_per_context = n_trajectories_per_context
 
-    def eval_agent(self, agent, contexts, n_trajectories, mode_encoding, successes, mean_distance, pid, cpu_set, if_vision=False):
+    def eval_agent(self, agent, contexts, n_trajectories, mode_encoding, successes, mean_distance, pid, cpu_set):
 
         print(os.getpid(), cpu_set)
         assign_process_to_cpu(os.getpid(), cpu_set)
 
-        env = Robot_Push_Env(render=self.render)
+        env = Robot_Push_Env(render=self.render, if_vision=self.if_vision)
         env.start()
 
         random.seed(pid)
@@ -72,7 +72,7 @@ class Aligning_Sim(BaseSim):
                 # test_context = env.manager.sample()
                 # obs = env.reset(random=False, context=test_context)
 
-                if if_vision:
+                if self.if_vision:
                     env_state, bp_image, inhand_image = obs
                     bp_image = bp_image.transpose((2, 0, 1)) / 255.
                     inhand_image = inhand_image.transpose((2, 0, 1)) / 255.
@@ -81,7 +81,7 @@ class Aligning_Sim(BaseSim):
                     done = False
 
                     while not done:
-                        pred_action = agent.predict((bp_image, inhand_image, des_robot_pos), if_vision=if_vision)
+                        pred_action = agent.predict((bp_image, inhand_image, des_robot_pos), if_vision=self.if_vision)
                         pred_action = pred_action[0] + des_robot_pos
 
                         pred_action = np.concatenate((pred_action, [0, 1, 0, 0]), axis=0)
@@ -162,7 +162,6 @@ class Aligning_Sim(BaseSim):
                         "mean_distance": mean_distance,
                         "pid": i,
                         "cpu_set": set(cpu_set[i:i + 1]),
-                        "if_vision": self.if_vision
                     },
                 )
                 print("Start {}".format(i))
@@ -171,7 +170,7 @@ class Aligning_Sim(BaseSim):
             [p.join() for p in p_list]
 
         else:
-            self.eval_agent(agent, contexts, self.n_trajectories_per_context, mode_encoding, successes, mean_distance, 0, if_vision=self.if_vision, cpu_set=set([0]))
+            self.eval_agent(agent, contexts, self.n_trajectories_per_context, mode_encoding, successes, mean_distance, 0, cpu_set=set([0]))
 
         n_modes = 2
 

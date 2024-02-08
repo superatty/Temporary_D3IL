@@ -56,12 +56,12 @@ class Sorting_Sim(BaseSim):
 
         self.mode_encoding = torch.tensor(mode_encoding)
 
-    def eval_agent(self, agent, contexts, n_trajectories, mode_encoding, successes, mean_distance, pid, cpu_set, if_vision=False):
+    def eval_agent(self, agent, contexts, n_trajectories, mode_encoding, successes, mean_distance, pid, cpu_set):
 
         print(os.getpid(), cpu_set)
         assign_process_to_cpu(os.getpid(), cpu_set)
 
-        env = Sorting_Env(max_steps_per_episode=self.max_steps_per_episode, render=self.render, num_boxes=self.num_box, if_vision=if_vision)
+        env = Sorting_Env(max_steps_per_episode=self.max_steps_per_episode, render=self.render, num_boxes=self.num_box, if_vision=self.if_vision)
         env.start()
 
         random.seed(pid)
@@ -76,7 +76,7 @@ class Sorting_Sim(BaseSim):
                 print(f'Context {context} Rollout {i}')
                 # training contexts
                 # env.manager.set_index(context)
-                obs = env.reset(random=False, context=self.test_contexts[context], if_vision=if_vision)
+                obs = env.reset(random=False, context=self.test_contexts[context], if_vision=self.if_vision)
 
                 # obs = env.reset()
 
@@ -85,7 +85,7 @@ class Sorting_Sim(BaseSim):
                 # obs = env.reset(random=False, context=test_context)
 
                 # rollout for image_based policy
-                if if_vision:
+                if self.if_vision:
 
                     robot_pos, bp_image, inhand_image = obs
                     bp_image = bp_image.transpose((2, 0, 1)) / 255.
@@ -97,7 +97,7 @@ class Sorting_Sim(BaseSim):
 
                     while not done:
 
-                        pred_action = agent.predict((bp_image, inhand_image, des_robot_pos), if_vision=if_vision)
+                        pred_action = agent.predict((bp_image, inhand_image, des_robot_pos), if_vision=self.if_vision)
                         pred_action = pred_action[0] + des_robot_pos
 
                         pred_action = np.concatenate((pred_action, fixed_z, [0, 1, 0, 0]), axis=0)
@@ -177,7 +177,6 @@ class Sorting_Sim(BaseSim):
                         "successes": successes,
                         "mean_distance": mean_distance,
                         "pid": i,
-                        "if_vision": self.if_vision,
                         "cpu_set": set(cpu_set[i:i+1])
                     },
                 )
@@ -187,7 +186,7 @@ class Sorting_Sim(BaseSim):
             [p.join() for p in p_list]
 
         else:
-            self.eval_agent(agent, contexts, self.n_trajectories_per_context, mode_encoding, successes, mean_distance, 0, if_vision=self.if_vision, cpu_set=set([0]))
+            self.eval_agent(agent, contexts, self.n_trajectories_per_context, mode_encoding, successes, mean_distance, 0, cpu_set=set([0]))
 
         success_rate = torch.mean(successes).item()
         mode_probs = torch.zeros([self.n_contexts, self.n_mode])
