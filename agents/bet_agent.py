@@ -30,7 +30,7 @@ class BeT_Policy(nn.Module):
 
         self.model = hydra.utils.instantiate(model).to(device)
 
-    def get_latent_and_loss(self, inputs, latent):
+    def get_loss(self, inputs, latent):
         if self.visual_input:
             agentview_image, in_hand_image, state = inputs
 
@@ -56,7 +56,7 @@ class BeT_Policy(nn.Module):
             return_loss_components=True,
         )
 
-        return _, loss, loss_components
+        return loss
 
     def forward(self, inputs):
         # encode state and visual inputs
@@ -179,118 +179,118 @@ class BeT_Agent(BaseAgent):
             
     
 
-    def train_agent(self):
+    # def train_agent(self):
 
-        self.action_ae.fit_model(self.train_dataloader, self.test_dataloader, self.scaler)
+    #     self.action_ae.fit_model(self.train_dataloader, self.test_dataloader, self.scaler)
 
-        best_test_loss = 1e10
+    #     best_test_loss = 1e10
 
-        for num_epoch in tqdm(range(self.epoch)):
+    #     for num_epoch in tqdm(range(self.epoch)):
 
-            # train the model
-            self.model.train()
+    #         # train the model
+    #         self.model.train()
 
-            train_loss = []
-            with utils.eval_mode(self.action_ae):
-                for data in self.train_dataloader:
+    #         train_loss = []
+    #         with utils.eval_mode(self.action_ae):
+    #             for data in self.train_dataloader:
 
-                    observations, action, mask = data
+    #                 observations, action, mask = data
                     
-                    observations = self.scaler.scale_input(observations)
-                    action = self.scaler.scale_output(action)
+    #                 observations = self.scaler.scale_input(observations)
+    #                 action = self.scaler.scale_output(action)
 
-                    loss, loss_components = self.train_step(observations, action)
+    #                 loss, loss_components = self.train_step(observations, action)
 
-                    train_loss.append(loss.item())
+    #                 train_loss.append(loss.item())
 
-                    wandb.log(
-                        {
-                            "offset_loss": loss_components['offset'].item(),
-                            "class_loss": loss_components['class'].item(),
-                            "total_loss": loss_components['total'].item(),
-                        }
-                    )
-                avrg_train_loss = sum(train_loss) / len(train_loss)
-                log.info("Epoch {}: Average train loss is {}".format(num_epoch, avrg_train_loss))
+    #                 wandb.log(
+    #                     {
+    #                         "offset_loss": loss_components['offset'].item(),
+    #                         "class_loss": loss_components['class'].item(),
+    #                         "total_loss": loss_components['total'].item(),
+    #                     }
+    #                 )
+    #             avrg_train_loss = sum(train_loss) / len(train_loss)
+    #             log.info("Epoch {}: Average train loss is {}".format(num_epoch, avrg_train_loss))
 
-            ####################################################################
-            # evaluate the model
-            if not (num_epoch+1) % self.eval_every_n_epochs:
+    #         ####################################################################
+    #         # evaluate the model
+    #         if not (num_epoch+1) % self.eval_every_n_epochs:
 
-                with utils.eval_mode(self.action_ae, self.model, no_grad=True):
+    #             with utils.eval_mode(self.action_ae, self.model, no_grad=True):
 
-                    test_loss = []
-                    for data in self.test_dataloader:
+    #                 test_loss = []
+    #                 for data in self.test_dataloader:
 
-                        observations, action, mask = data
+    #                     observations, action, mask = data
                         
-                        observations = self.scaler.scale_input(observations)
-                        action = self.scaler.scale_output(action)
+    #                     observations = self.scaler.scale_input(observations)
+    #                     action = self.scaler.scale_output(action)
                         
-                        loss, loss_components = self.evaluate(observations, action)
+    #                     loss, loss_components = self.evaluate(observations, action)
 
-                        test_loss.append(loss.item())
-                        wandb.log(
-                            {
-                                "eval_offset_loss": loss_components['offset'].item(),
-                                "eval_class_loss": loss_components['class'].item(),
-                                "eval_total_loss": loss_components['total'].item(),
-                            }
-                        )
+    #                     test_loss.append(loss.item())
+    #                     wandb.log(
+    #                         {
+    #                             "eval_offset_loss": loss_components['offset'].item(),
+    #                             "eval_class_loss": loss_components['class'].item(),
+    #                             "eval_total_loss": loss_components['total'].item(),
+    #                         }
+    #                     )
 
-                    avrg_test_loss = sum(test_loss) / len(test_loss)
-                    log.info("Epoch {}: Average test loss is {}".format(num_epoch, avrg_test_loss))
+    #                 avrg_test_loss = sum(test_loss) / len(test_loss)
+    #                 log.info("Epoch {}: Average test loss is {}".format(num_epoch, avrg_test_loss))
 
-                    if avrg_test_loss < best_test_loss:
-                        best_test_loss = avrg_test_loss
-                        self.store_model_weights(self.working_dir, sv_name=self.eval_model_name)
+    #                 if avrg_test_loss < best_test_loss:
+    #                     best_test_loss = avrg_test_loss
+    #                     self.store_model_weights(self.working_dir, sv_name=self.eval_model_name)
 
-                        wandb.log(
-                            {
-                                "best_model_epochs": num_epoch
-                            }
-                        )
+    #                     wandb.log(
+    #                         {
+    #                             "best_model_epochs": num_epoch
+    #                         }
+    #                     )
 
-                        log.info('New best test loss. Stored weights have been updated!')
+    #                     log.info('New best test loss. Stored weights have been updated!')
 
-                    wandb.log(
-                        {
-                            "avrg_test_loss": avrg_test_loss,
-                        }
-                    )
+    #                 wandb.log(
+    #                     {
+    #                         "avrg_test_loss": avrg_test_loss,
+    #                     }
+    #                 )
 
-        self.store_model_weights(self.working_dir, sv_name=self.last_model_name)
-        log.info("Training done!")
+    #     self.store_model_weights(self.working_dir, sv_name=self.last_model_name)
+    #     log.info("Training done!")
 
-    def train_vision_agent(self):
+    # def train_vision_agent(self):
 
-        # train the model
-        self.model.train()
+    #     # train the model
+    #     self.model.train()
 
-        train_loss = []
-        with utils.eval_mode(self.action_ae):
-            for data in self.train_dataloader:
-                bp_imgs, inhand_imgs, obs, action, mask = data
+    #     train_loss = []
+    #     with utils.eval_mode(self.action_ae):
+    #         for data in self.train_dataloader:
+    #             bp_imgs, inhand_imgs, obs, action, mask = data
 
-                bp_imgs = bp_imgs.to(self.device)
-                inhand_imgs = inhand_imgs.to(self.device)
+    #             bp_imgs = bp_imgs.to(self.device)
+    #             inhand_imgs = inhand_imgs.to(self.device)
 
-                obs = self.scaler.scale_input(obs)
-                action = self.scaler.scale_output(action)
+    #             obs = self.scaler.scale_input(obs)
+    #             action = self.scaler.scale_output(action)
 
-                state = (bp_imgs, inhand_imgs, obs)
+    #             state = (bp_imgs, inhand_imgs, obs)
 
-                loss, loss_components = self.train_step(state, action)
+    #             loss, loss_components = self.train_step(state, action)
 
-                train_loss.append(loss.item())
+    #             train_loss.append(loss.item())
 
-                wandb.log(
-                    {
-                        "offset_loss": loss_components['offset'].item(),
-                        "class_loss": loss_components['class'].item(),
-                        "total_loss": loss_components['total'].item(),
-                    }
-                )
+    #             wandb.log(
+    #                 {
+    #                     "offset_loss": loss_components['offset'].item(),
+    #                     "class_loss": loss_components['class'].item(),
+    #                     "total_loss": loss_components['total'].item(),
+    #                 }
+    #             )
 
     def train_step(self, state: torch.Tensor, actions: torch.Tensor):
         """
@@ -301,7 +301,7 @@ class BeT_Agent(BaseAgent):
 
         latent = self.action_ae.encode_into_latent(actions)
 
-        _, loss, loss_components = self.model.get_latent_and_loss(inputs=state, latent=latent)
+        loss = self.model.get_loss(inputs=state, latent=latent)
         loss.backward()
 
         torch.nn.utils.clip_grad_norm_(
@@ -309,7 +309,7 @@ class BeT_Agent(BaseAgent):
         )
         self.state_prior_optimizer.step()
 
-        return loss, loss_components
+        return loss
 
     @torch.no_grad()
     def evaluate(self, state: torch.Tensor, action: torch.Tensor):
@@ -318,12 +318,12 @@ class BeT_Agent(BaseAgent):
         """
 
         latent = self.action_ae.encode_into_latent(action)
-        _, loss, loss_components = self.model.get_latent_and_loss(
+        loss = self.model.get_loss(
             inputs=state,
             latent=latent,
         )
 
-        return loss, loss_components
+        return loss
 
     def predict(self, state, sample=False, if_vision=False):
 

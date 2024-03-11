@@ -5,6 +5,7 @@ import logging
 import torch
 from omegaconf import DictConfig
 import hydra
+from tqdm import tqdm
 
 import wandb
 
@@ -79,19 +80,102 @@ class BaseAgent(abc.ABC):
         else:
             self.train_agent()
             
-    @abc.abstractmethod
     def train_agent(self):
         """
         Main method to train the agent on the given train and test data
         """
-        pass
+        best_test_loss = 1e10
+
+        for num_epoch in tqdm(range(self.epoch)):
+
+            if not (num_epoch+1) % self.eval_every_n_epochs:
+                test_losses = []
+                for data in self.test_dataloader:
+                    state, action, mask = data
+
+                    state = self.scaler.scale_input(state)
+                    action = self.scaler.scale_output(action)
+
+                    test_loss = self.evaluate(state, action)
+                    test_losses.append(test_loss)
+
+                    wandb.log(
+                        {
+                            "test_loss": test_loss,
+                        }
+                    )
+
+                mean_test_loss = sum(test_losses) / len(test_losses)
+
+                log.info("Epoch {}: Mean test loss is {}".format(num_epoch, mean_test_loss))
+
+                if mean_test_loss < best_test_loss:
+                    best_test_loss = mean_test_loss
+                    self.store_model_weights(self.working_dir, sv_name=self.eval_model_name)
+
+                    wandb.log(
+                        {
+                            "best_model_epochs": num_epoch
+                        }
+                    )
+
+                    log.info('New best test loss. Stored weights have been updated!')
+
+                wandb.log(
+                    {
+                        "mean_test_loss": mean_test_loss,
+                    }
+                )
+
+            train_losses = []
+            for data in self.train_dataloader:
+                state, action, mask = data 
+
+                state = self.scaler.scale_input(state)
+                action = self.scaler.scale_output(action)
+
+                batch_loss = self.train_step(state, action)
+
+                train_losses.append(batch_loss)
+
+                wandb.log(
+                    {
+                        "loss": batch_loss,
+                    }
+                )
+
+            avg_train_loss = sum(train_losses) / len(train_losses)
+            log.info("Epoch {}: Average train loss is {}".format(num_epoch, avg_train_loss))
+
+        self.store_model_weights(self.working_dir, sv_name=self.last_model_name)
+
+        log.info("Training done!")
      
-    @abc.abstractmethod
     def train_vision_agent(self):
         """
         Main method to train the vision agent on the given train and test data
         """
-        pass
+        train_loss = []
+        for data in self.train_dataloader:
+            bp_imgs, inhand_imgs, obs, action, mask = data
+
+            bp_imgs = bp_imgs.to(self.device)
+            inhand_imgs = inhand_imgs.to(self.device)
+
+            obs = self.scaler.scale_input(obs)
+            action = self.scaler.scale_output(action)
+
+            state = (bp_imgs, inhand_imgs, obs)
+
+            batch_loss = self.train_step(state, action)
+
+            train_loss.append(batch_loss)
+
+            wandb.log(
+                {
+                    "loss": batch_loss,
+                }
+            )
 
     @abc.abstractmethod
     def train_step(self, state: torch.Tensor, action: torch.Tensor):

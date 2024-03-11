@@ -1,10 +1,11 @@
-_target_: agents.bet_mlp_agent.BetMLP_Agent
+_target_: agents.bet_mlp_agent.BeT_MLP_Agent
 _recursive_: false
 
 model:
-  _target_: agents.bet_mlp_agent.BeTPolicy
+  _target_: agents.bet_mlp_agent.BeT_MLP_Policy
   _recursive_: false
-
+  
+  visual_input: False
   obs_dim: ${obs_dim}
   act_dim: ${action_dim}
   vocab_size: 64
@@ -19,7 +20,6 @@ model:
     input_dim: ${obs_dim}
     hidden_dim: ${hidden_dim}
     num_hidden_layers: ${num_hidden_layers}
-#    output_dim: ${action_dim}
     dropout: 0
     activation: 'Mish'
     use_spectral_norm: false
@@ -27,13 +27,12 @@ model:
     norm_style: 'BatchNorm'
     device: ${device}
 
-obs_encoding_net:
-  _target_: torch.nn.Identity
-  output_dim: ${obs_dim}
+  obs_encoder:
+    _target_: torch.nn.Identity
+    output_dim: ${obs_dim}
 
 action_ae:
   _target_: agents.models.bet.action_ae.discretizers.k_means.KMeansDiscretizer
-  #num_bins: 14
   action_dim: ${action_dim}
   device: ${device}
   predict_offsets: True
