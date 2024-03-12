@@ -15,7 +15,7 @@ model:
     state_dim: ${obs_dim}
     action_dim: ${action_dim}
     beta_schedule: 'cosine'
-    n_timesteps: 8
+    n_timesteps: 50
     loss_type: 'l2'
     clip_denoised: true
     predict_epsilon: true
@@ -24,22 +24,17 @@ model:
     diffusion_x_M: 10
 
     model:
-      _target_: agents.models.diffusion.diffusion_models.DiffusionTransformerNetwork
-      state_dim: ${obs_dim}
+      _target_: agents.models.diffusion.diffusion_models.DiffusionMLPNetwork
       action_dim: ${action_dim}
-      goal_conditioned: False
-      goal_seq_len: 10
-      obs_seq_len: ${window_size}
-      embed_pdrob: 0
-      goal_drop: 0
-      attn_pdrop: 0.2
-      resid_pdrop: 0.1
-      # Architecture details
-      embed_dim: ${n_embd}
-      n_layers: ${n_layer}
-      n_heads: ${n_head}
+      obs_dim: ${obs_dim}
+      t_dim: 16
+      residual_style: True
+      hidden_dim: ${hidden_dim}
+      num_hidden_layers: ${num_hidden_layers}
+      dropout: 0
+      activation: "Mish"
       device: ${device}
-      linear_output: true
+      goal_conditioned: False
 
   obs_encoder:
     _target_: torch.nn.Identity
@@ -47,9 +42,9 @@ model:
 
 optimization:
   _target_: torch.optim.Adam
-  lr: 5e-4 # for transformer
+  lr: 1e-3
   weight_decay: 0
-  
+
 trainset: ${trainset}
 valset: ${valset}
 train_batch_size: ${train_batch_size}

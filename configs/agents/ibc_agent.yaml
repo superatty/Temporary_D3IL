@@ -1,24 +1,35 @@
-_target_: agents.ibc_agent.IBCAgent
+_target_: agents.ibc_agent.IBC_Agent
 _recursive_: false
 
 model:
-  _target_: agents.models.ibc.ebms.EBMMLP
+  _target_: agents.ibc_agent.IBC_Policy
   _recursive_: false
 
+  visual_input: false
   device: ${device}
 
-  mlp:
-    _target_: agents.models.common.mlp.ResidualMLPNetwork
-    input_dim: ${add:${action_dim}, ${obs_dim}}
-    hidden_dim: ${hidden_dim}
-    num_hidden_layers: ${num_hidden_layers}
-    output_dim: 1
-    dropout: 0
-    activation: 'Mish'
-    use_spectral_norm: false
-    use_norm: false
-    norm_style: 'BatchNorm'
+  model:
+    _target_: agents.models.ibc.ebms.EBMMLP
+    _recursive_: false
+
     device: ${device}
+
+    mlp:
+      _target_: agents.models.common.mlp.ResidualMLPNetwork
+      input_dim: ${add:${action_dim}, ${obs_dim}}
+      hidden_dim: ${hidden_dim}
+      num_hidden_layers: ${num_hidden_layers}
+      output_dim: 1
+      dropout: 0
+      activation: 'Mish'
+      use_spectral_norm: false
+      use_norm: false
+      norm_style: 'BatchNorm'
+      device: ${device}
+
+  obs_encoder:
+    _target_: torch.nn.Identity
+    output_dim: ${obs_dim}
 
 sampler:
   _target_: agents.models.ibc.samplers.langevin_mcmc.LangevinMCMCSampler

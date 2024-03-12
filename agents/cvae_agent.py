@@ -13,8 +13,52 @@ from agents.base_agent import BaseAgent
 
 log = logging.getLogger(__name__)
 
+class CVAE_Policy(nn.Module):
+    def __init__(self, model: DictConfig, obs_encoder: DictConfig, visual_input: bool = False, device: str = "cpu"):
+        super(CVAE_Policy, self).__init__()
 
-class CVAEAgent(BaseAgent):
+        self.visual_input = visual_input
+        self.obs_encoder = hydra.utils.instantiate(obs_encoder).to(device)
+        self.model = hydra.utils.instantiate(model).to(device)
+        
+    def get_embedding(self, state):
+        if self.visual_input:
+            agentview_image, in_hand_image, state = state
+
+            B, T, C, H, W = agentview_image.size()
+
+            agentview_image = agentview_image.view(B * T, C, H, W)
+            in_hand_image = in_hand_image.view(B * T, C, H, W)
+            state = state.view(B * T, -1)
+            
+            obs_dict = {"agentview_image": agentview_image,
+                        "in_hand_image": in_hand_image,
+                        "robot_ee_pos": state}
+
+            obs = self.obs_encoder(obs_dict)
+            obs = obs.view(B, T, -1)
+            
+        else:
+            obs = self.obs_encoder(state)
+            
+        return obs
+        
+
+    def forward(self, state, action):
+        obs = self.get_embedding(state)
+        pred = self.model(obs, action)
+        return pred
+
+    def predict(self, state):
+        obs = self.get_embedding(state)
+        pred = self.model.predict(obs)[0]
+        return pred
+
+    def get_params(self):
+        return self.parameters()
+
+
+class CVAE_Agent(BaseAgent):
     def __init__(
             self,
             model: DictConfig,
@@ -33,6 +77,14 @@ class CVAEAgent(BaseAgent):
         super().__init__(model, trainset=trainset, valset=valset, train_batch_size=train_batch_size,
                          val_batch_size=val_batch_size, num_workers=num_workers, device=device,
                          epoch=epoch, scale_data=scale_data, eval_every_n_epochs=eval_every_n_epochs)
+        
+        # Define the number of GPUs available
+        num_gpus = torch.cuda.device_count()
+
+        # Check if multiple GPUs are available and select the appropriate device
+        if num_gpus > 1:
+            print(f"Using {num_gpus} GPUs for training.")
+            self.model = nn.DataParallel(self.model)
 
         self.optimizer = hydra.utils.instantiate(
             optimization, params=self.model.get_params()
@@ -46,73 +98,71 @@ class CVAEAgent(BaseAgent):
         self.min_action = torch.from_numpy(self.scaler.y_bounds[0, :]).to(self.device)
         self.max_action = torch.from_numpy(self.scaler.y_bounds[1, :]).to(self.device)
 
-    def train_agent(self):
-        best_test_mse = 1e10
+    # def train_agent(self):
+    #     best_test_mse = 1e10
 
-        for num_epoch in tqdm(range(self.epoch)):
+    #     for num_epoch in tqdm(range(self.epoch)):
 
-            if not (num_epoch+1) % self.eval_every_n_epochs:
-                test_mse = []
-                for data in self.test_dataloader:
-                    state, action, mask = [torch.squeeze(data[i]) for i in range(3)]
+    #         if not (num_epoch+1) % self.eval_every_n_epochs:
+    #             test_mse = []
+    #             for data in self.test_dataloader:
+    #                 state, action, mask = [torch.squeeze(data[i]) for i in range(3)]
 
-                    mean_mse = self.evaluate(state, action)
-                    test_mse.append(mean_mse)
+    #                 mean_mse = self.evaluate(state, action)
+    #                 test_mse.append(mean_mse)
 
-                    wandb.log(
-                        {
-                            "test_loss": mean_mse,
-                        }
-                    )
+    #                 wandb.log(
+    #                     {
+    #                         "test_loss": mean_mse,
+    #                     }
+    #                 )
 
-                avrg_test_mse = sum(test_mse) / len(test_mse)
+    #             avrg_test_mse = sum(test_mse) / len(test_mse)
 
-                log.info("Epoch {}: Mean test mse is {}".format(num_epoch, avrg_test_mse))
-                if avrg_test_mse < best_test_mse:
-                    best_test_mse = avrg_test_mse
-                    self.store_model_weights(self.working_dir, sv_name=self.eval_model_name)
+    #             log.info("Epoch {}: Mean test mse is {}".format(num_epoch, avrg_test_mse))
+    #             if avrg_test_mse < best_test_mse:
+    #                 best_test_mse = avrg_test_mse
+    #                 self.store_model_weights(self.working_dir, sv_name=self.eval_model_name)
 
-                    wandb.log(
-                        {
-                            "best_model_epochs": num_epoch
-                        }
-                    )
+    #                 wandb.log(
+    #                     {
+    #                         "best_model_epochs": num_epoch
+    #                     }
+    #                 )
 
-                    log.info('New best test loss. Stored weights have been updated!')
+    #                 log.info('New best test loss. Stored weights have been updated!')
 
-                wandb.log(
-                    {
-                        "mean_test_loss": avrg_test_mse,
-                    }
-                )
+    #             wandb.log(
+    #                 {
+    #                     "mean_test_loss": avrg_test_mse,
+    #                 }
+    #             )
 
-            train_loss = []
-            for data in self.train_dataloader:
-                state, action, mask = [torch.squeeze(data[i]) for i in range(3)]
-                batch_loss = self.train_step(state, action)
+    #         train_loss = []
+    #         for data in self.train_dataloader:
+    #             state, action, mask = [torch.squeeze(data[i]) for i in range(3)]
+    #             batch_loss = self.train_step(state, action)
 
-                train_loss.append(batch_loss)
+    #             train_loss.append(batch_loss)
 
-                wandb.log(
-                    {
-                        "loss": batch_loss,
-                    }
-                )
+    #             wandb.log(
+    #                 {
+    #                     "loss": batch_loss,
+    #                 }
+    #             )
 
-            avrg_train_loss = sum(train_loss) / len(train_loss)
-            log.info("Epoch {}: Average train loss is {}".format(num_epoch, avrg_train_loss))
+    #         avrg_train_loss = sum(train_loss) / len(train_loss)
+    #         log.info("Epoch {}: Average train loss is {}".format(num_epoch, avrg_train_loss))
 
-        self.store_model_weights(self.working_dir, sv_name=self.last_model_name)
+    #     self.store_model_weights(self.working_dir, sv_name=self.last_model_name)
 
-        log.info("Training done!")
+    #     log.info("Training done!")
 
-    def train_step(self, state: torch.Tensor, actions: torch.Tensor):
+    def train_step(self, state, actions):
         """
         Executes a single training step on a mini-batch of data
         """
         self.model.train()
-        state = self.scaler.scale_input(state)
-        actions = self.scaler.scale_output(actions)
 
         action_pred, mean, std = self.model(state, actions)
 
@@ -129,16 +179,13 @@ class CVAEAgent(BaseAgent):
         return loss.item()
 
     @torch.no_grad()
-    def evaluate(self, state: torch.Tensor, actions: torch.Tensor):
+    def evaluate(self, state, actions):
         """
         Method for evaluating the model on one epoch of data
         """
         self.model.eval()
 
         total_loss = 0.0
-
-        state = self.scaler.scale_input(state)
-        actions = self.scaler.scale_output(actions)
 
         action_pred, mean, std = self.model(state, actions)
 
@@ -153,14 +200,25 @@ class CVAEAgent(BaseAgent):
         return total_loss
 
     @torch.no_grad()
-    def predict(self, state) -> torch.Tensor:
+    def predict(self, state, if_vision=False) -> torch.Tensor:
         """
         Method for predicting one step with input data
         """
         self.model.eval()
 
-        state = torch.from_numpy(state).float().to(self.device).unsqueeze(0)
-        state = self.scaler.scale_input(state)
+        if if_vision:
+            bp_image, inhand_image, des_robot_pos = state
+
+            bp_image = torch.from_numpy(bp_image).to(self.device).float().unsqueeze(0).unsqueeze(0)
+            inhand_image = torch.from_numpy(inhand_image).to(self.device).float().unsqueeze(0).unsqueeze(0)
+            des_robot_pos = torch.from_numpy(des_robot_pos).to(self.device).float().unsqueeze(0).unsqueeze(0)
+
+            des_robot_pos = self.scaler.scale_input(des_robot_pos)
+
+            state = (bp_image, inhand_image, des_robot_pos)
+        else:
+            state = torch.from_numpy(state).float().to(self.device).unsqueeze(0).unsqueeze(0)
+            state = self.scaler.scale_input(state)
 
         out = self.model.predict(state)
 

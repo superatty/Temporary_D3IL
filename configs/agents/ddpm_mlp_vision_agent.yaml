@@ -1,8 +1,8 @@
-_target_: agents.ddpm_vision_agent.DiffusionAgent
+_target_: agents.ddpm_agent.DDPM_Agent
 _recursive_: false
 
 model:
-  _target_: agents.ddpm_vision_agent.DiffusionPolicy
+  _target_: agents.ddpm_agent.DDPM_Policy
   _recursive_: false
 
   visual_input: True
@@ -47,33 +47,16 @@ model:
         in_hand_image:
           shape: [ 3, 96, 96 ]
           type: rgb
-    #        robot_ee_pos:
-    #          shape: [3]
-    #          type default: low_dim
-    #      robot0_eef_quat:
-    #        shape: [4]
-    #      robot0_gripper_qpos:
-    #        shape: [2]
-    #    action:
-    #      shape: [10]
 
     rgb_model:
       _target_: agents.models.vision.model_getter.get_resnet
       input_shape: [ 3, 96, 96 ]
       output_size: 64
     resize_shape: null
-    #    crop_shape: [ 84, 84 ]
-    # constant center crop
     random_crop: False
     use_group_norm: True
     share_rgb_model: False
     imagenet_norm: True
-
-#optimization:
-#  _target_: torch.optim.Adam
-#  lr: 1e-3 # for transformer
-##  lr: 5e-4 # for MLP
-#  weight_decay: 0
 
 optimization:
   _target_: torch.optim.AdamW
@@ -81,13 +64,6 @@ optimization:
   betas: [0.95, 0.999]
   eps: 1.0e-8
   weight_decay: 1.0e-6
-
-#optimization:
-#  _target_: torch.optim.AdamW
-#  lr: 1.0e-3
-#  betas: [0.9, 0.995]
-#  eps: 1.0e-8
-#  weight_decay: 0.1
 
 trainset: ${trainset}
 valset: ${valset}

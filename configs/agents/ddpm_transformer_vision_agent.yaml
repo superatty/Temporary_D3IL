@@ -1,8 +1,8 @@
-_target_: agents.ddpm_vision_agent.DiffusionAgent
+_target_: agents.ddpm_agent.DDPM_Agent
 _recursive_: false
 
 model:
-  _target_: agents.ddpm_vision_agent.DiffusionPolicy
+  _target_: agents.ddpm_agent.DDPM_Policy
   _recursive_: false
 
   visual_input: True
@@ -74,25 +74,12 @@ model:
     share_rgb_model: False
     imagenet_norm: True
 
-#optimization:
-#  _target_: torch.optim.Adam
-#  lr: 5e-4 # for transformer
-##  lr: 5e-4 # for MLP
-#  weight_decay: 0
-
 optimization:
   _target_: torch.optim.AdamW
   lr: 1.0e-4
   betas: [0.95, 0.999]
   eps: 1.0e-8
   weight_decay: 1.0e-6
-
-#optimization:
-#  _target_: torch.optim.AdamW
-#  lr: 1.0e-4
-#  betas: [0.9, 0.995]
-#  eps: 1.0e-8
-#  weight_decay: 0.1
 
 trainset: ${trainset}
 valset: ${valset}

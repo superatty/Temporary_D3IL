@@ -19,8 +19,51 @@ from agents.models.diffusion.ema import ExponentialMovingAverage
 # A logger for this file
 log = logging.getLogger(__name__)
 
+class DDPM_Policy(nn.Module):
+    def __init__(self, model: DictConfig, obs_encoder: DictConfig, visual_input: bool = False, device: str = "cpu"):
+        super(DDPM_Policy, self).__init__()
 
-class DiffusionAgent(BaseAgent):
+        self.visual_input = visual_input
+
+        self.obs_encoder = hydra.utils.instantiate(obs_encoder).to(device)
+
+        self.model = hydra.utils.instantiate(model).to(device)
+
+    def forward(self, inputs, goal, action=None, if_train=False):
+        # encode state and visual inputs
+        # the encoder should be shared by all the baselines
+
+        if self.visual_input:
+            agentview_image, in_hand_image, state = inputs
+            B, T, C, H, W = agentview_image.size()
+
+            agentview_image = agentview_image.view(B * T, C, H, W)
+            in_hand_image = in_hand_image.view(B * T, C, H, W)
+            state = state.view(B * T, -1)
+            
+            obs_dict = {"agentview_image": agentview_image,
+                        "in_hand_image": in_hand_image,
+                        "robot_ee_pos": state}
+
+            obs = self.obs_encoder(obs_dict)
+            obs = obs.view(B, T, -1)
+
+        else:
+            obs = self.obs_encoder(inputs)
+
+        if if_train:
+            return self.model.loss(action, obs, goal)
+
+        # make prediction
+        pred = self.model(obs, goal)
+
+        return pred
+
+    def get_params(self):
+        return self.parameters()
+
+
+class DDPM_Agent(BaseAgent):
 
     def __init__(
             self,
@@ -51,19 +94,27 @@ class DiffusionAgent(BaseAgent):
                          epoch=epoch, scale_data=scale_data, eval_every_n_epochs=eval_every_n_epochs)
 
         # Define the bounds for the sampler class
-        self.model.min_action = torch.from_numpy(self.scaler.y_bounds[0, :]).to(self.device)
-        self.model.max_action = torch.from_numpy(self.scaler.y_bounds[1, :]).to(self.device)
+        self.model.model.min_action = torch.from_numpy(self.scaler.y_bounds[0, :]).to(self.device)
+        self.model.model.max_action = torch.from_numpy(self.scaler.y_bounds[1, :]).to(self.device)
+
+        # Define the number of GPUs available
+        num_gpus = torch.cuda.device_count()
+        
+        # Check if multiple GPUs are available and select the appropriate device
+        if num_gpus > 1:
+            print(f"Using {num_gpus} GPUs for training.")
+            self.model = nn.DataParallel(self.model)
 
         self.eval_model_name = "eval_best_ddpm.pth"
         self.last_model_name = "last_ddpm.pth"
 
         self.optimizer = hydra.utils.instantiate(
-            optimization, params=self.model.get_params()
+            optimization, params=self.model.parameters()
         )
 
         self.steps = 0
 
-        self.ema_helper = ExponentialMovingAverage(self.model.get_params(), decay, self.device)
+        self.ema_helper = ExponentialMovingAverage(self.model.parameters(), decay, self.device)
         self.use_ema = use_ema
         self.discount = discount
         self.decay = decay
@@ -74,6 +125,10 @@ class DiffusionAgent(BaseAgent):
         self.pred_last_action_only = pred_last_action_only
 
         self.goal_condition = goal_conditioned
+
+        self.bp_image_context = deque(maxlen=self.window_size)
+        self.inhand_image_context = deque(maxlen=self.window_size)
+        self.des_robot_pos_context = deque(maxlen=self.window_size)
 
         self.obs_context = deque(maxlen=self.window_size)
         self.goal_context = deque(maxlen=self.goal_window_size)
@@ -87,78 +142,71 @@ class DiffusionAgent(BaseAgent):
         self.diffusion_kde = diffusion_kde
         self.diffusion_kde_samples = diffusion_kde_samples
 
-    def train_agent(self):
+    # def train_agent(self):
 
-        best_test_mse = 1e10
+    #     best_test_mse = 1e10
 
-        for num_epoch in tqdm(range(self.epoch)):
+    #     for num_epoch in tqdm(range(self.epoch)):
 
-            # run a test batch every n steps
-            if not (num_epoch+1) % self.eval_every_n_epochs:
+    #         # run a test batch every n steps
+    #         if not (num_epoch+1) % self.eval_every_n_epochs:
 
-                test_mse = []
-                for data in self.test_dataloader:
+    #             test_mse = []
+    #             for data in self.test_dataloader:
 
-                    if self.goal_condition:
-                        state, action, mask, goal = data
-                        mean_mse = self.evaluate(state, action, goal)
-                    else:
-                        state, action, mask = data
-                        mean_mse = self.evaluate(state, action)
+    #                 if self.goal_condition:
+    #                     state, action, mask, goal = data
+    #                     mean_mse = self.evaluate(state, action, goal)
+    #                 else:
+    #                     state, action, mask = data
+    #                     mean_mse = self.evaluate(state, action)
 
-                    test_mse.append(mean_mse)
-                avrg_test_mse = sum(test_mse) / len(test_mse)
+    #                 test_mse.append(mean_mse)
+    #             avrg_test_mse = sum(test_mse) / len(test_mse)
 
-                log.info("Epoch {}: Mean test mse is {}".format(num_epoch, avrg_test_mse))
-                if avrg_test_mse < best_test_mse:
-                    best_test_mse = avrg_test_mse
-                    self.store_model_weights(self.working_dir, sv_name=self.eval_model_name)
+    #             log.info("Epoch {}: Mean test mse is {}".format(num_epoch, avrg_test_mse))
+    #             if avrg_test_mse < best_test_mse:
+    #                 best_test_mse = avrg_test_mse
+    #                 self.store_model_weights(self.working_dir, sv_name=self.eval_model_name)
 
-                    wandb.log(
-                        {
-                            "best_model_epochs": num_epoch
-                        }
-                    )
+    #                 wandb.log(
+    #                     {
+    #                         "best_model_epochs": num_epoch
+    #                     }
+    #                 )
 
-                    log.info('New best test loss. Stored weights have been updated!')
+    #                 log.info('New best test loss. Stored weights have been updated!')
 
-            train_loss = []
-            for data in self.train_dataloader:
+    #         train_loss = []
+    #         for data in self.train_dataloader:
 
-                if self.goal_condition:
-                    state, action, mask, goal = data
-                    batch_loss = self.train_step(state, action, goal)
-                else:
-                    state, action, mask = data
-                    batch_loss = self.train_step(state, action)
+    #             if self.goal_condition:
+    #                 state, action, mask, goal = data
+    #                 batch_loss = self.train_step(state, action, goal)
+    #             else:
+    #                 state, action, mask = data
+    #                 batch_loss = self.train_step(state, action)
 
-                train_loss.append(batch_loss)
+    #             train_loss.append(batch_loss)
 
-                wandb.log(
-                    {
-                        "loss": batch_loss,
-                    }
-                )
+    #             wandb.log(
+    #                 {
+    #                     "loss": batch_loss,
+    #                 }
+    #             )
 
-        self.store_model_weights(self.working_dir, sv_name=self.last_model_name)
+    #     self.store_model_weights(self.working_dir, sv_name=self.last_model_name)
 
-        log.info("Training done!")
+    #     log.info("Training done!")
 
-    def train_step(self, state: torch.Tensor, action: torch.Tensor, goal: Optional[torch.Tensor] = None) -> float:
-
-        # state = state.to(self.device).to(torch.float32)  # [B, V]
-        # action = action.to(self.device).to(torch.float32)  # [B, D]
-        # scale data if necessarry, otherwise the scaler will return unchanged values
+    def train_step(self, state, action, goal: Optional[torch.Tensor] = None) -> float:
         self.model.train()
-
-        state = self.scaler.scale_input(state)
-        action = self.scaler.scale_output(action)
 
         if goal is not None:
             goal = self.scaler.scale_input(goal)
 
         # Compute the loss.
-        loss = self.model.loss(action, state, goal)
+        loss = self.model(state, goal, action=action, if_train=True)
         # Before the backward pass, zero all the network gradients
         self.optimizer.zero_grad()
         # Backward pass: compute gradient of the loss with respect to parameters
@@ -175,13 +223,9 @@ class DiffusionAgent(BaseAgent):
 
     @torch.no_grad()
     def evaluate(
-            self, state: torch.tensor, action: torch.tensor, goal: Optional[torch.Tensor] = None
+            self, state, action, goal: Optional[torch.Tensor] = None
     ) -> float:
-
-        # scale data if necessarry, otherwise the scaler will return unchanged values
-        state = self.scaler.scale_input(state)
-        action = self.scaler.scale_output(action)
-
+        
         if goal is not None:
             goal = self.scaler.scale_input(goal)
 
@@ -194,10 +238,7 @@ class DiffusionAgent(BaseAgent):
         self.model.eval()
 
         # Compute the loss.
-        loss = self.model.loss(action, state, goal)
-
-        # model_pred = self.model(state, goal)
-        # mse = nn.functional.mse_loss(model_pred, action, reduction="none")
+        loss = self.model(state, goal, action=action, if_train=True)
 
         total_mse += loss.mean().item()
 
@@ -211,25 +252,36 @@ class DiffusionAgent(BaseAgent):
         self.obs_context.clear()
 
     @torch.no_grad()
-    def predict(self, state: torch.Tensor, goal: Optional[torch.Tensor] = None, extra_args=None) -> torch.Tensor:
+    def predict(self, state: torch.Tensor, goal: Optional[torch.Tensor] = None, extra_args=None, if_vision=False) -> torch.Tensor:
         # scale data if necessarry, otherwise the scaler will return unchanged values
 
-        state = torch.from_numpy(state).float().to(self.device).unsqueeze(0)
-        state = self.scaler.scale_input(state)
+        if if_vision:
+            bp_image, inhand_image, des_robot_pos = state
+
+            bp_image = torch.from_numpy(bp_image).to(self.device).float().unsqueeze(0)
+            inhand_image = torch.from_numpy(inhand_image).to(self.device).float().unsqueeze(0)
+            des_robot_pos = torch.from_numpy(des_robot_pos).to(self.device).float().unsqueeze(0)
+
+            des_robot_pos = self.scaler.scale_input(des_robot_pos)
+
+            self.bp_image_context.append(bp_image)
+            self.inhand_image_context.append(inhand_image)
+            self.des_robot_pos_context.append(des_robot_pos)
+
+            bp_image_seq = torch.stack(tuple(self.bp_image_context), dim=0)
+            inhand_image_seq = torch.stack(tuple(self.inhand_image_context), dim=0)
+            des_robot_pos_seq = torch.stack(tuple(self.des_robot_pos_context), dim=0)
+
+            obs_seq = (bp_image_seq, inhand_image_seq, des_robot_pos_seq)
+
+        else:
+            obs = torch.from_numpy(state).float().to(self.device).unsqueeze(0)
+            obs = self.scaler.scale_input(obs)
+            self.obs_context.append(obs)
+            obs_seq = torch.stack(tuple(self.obs_context), dim=0)  # type: ignore
 
         if goal is not None:
             goal = self.scaler.scale_input(goal)
-
-        # add obs to window if we use transformer architecture
-        if self.window_size > 1:
-            # rearrange from 2d -> sequence
-            self.obs_context.append(state)  # this automatically manages the number of allowed observations
-            input_state = torch.stack(tuple(self.obs_context), dim=1)
-
-            if goal is not None:
-                goal = einops.rearrange(goal, 'b d -> 1 b d')
-        else:
-            input_state = state
 
         if self.use_ema:
             self.ema_helper.store(self.model.parameters())
@@ -244,7 +296,7 @@ class DiffusionAgent(BaseAgent):
             # https://openreview.net/pdf?id=Pv1GPQzRrC8
 
             # repeat state and goal tensor before passing to the model
-            state_rpt = torch.repeat_interleave(input_state, repeats=self.diffusion_kde_samples, dim=0)
+            state_rpt = torch.repeat_interleave(obs_seq, repeats=self.diffusion_kde_samples, dim=0)
             goal_rpt = torch.repeat_interleave(goal, repeats=self.diffusion_kde_samples, dim=0)
             # generate multiple samples
             x_0 = self.model(state_rpt, goal_rpt)
@@ -259,7 +311,7 @@ class DiffusionAgent(BaseAgent):
             model_pred = x_0[max_index]
         else:
             # do default model evaluation
-            model_pred = self.model(input_state, goal)
+            model_pred = self.model(obs_seq, goal)
             if model_pred.size()[1] > 1 and len(model_pred.size()) == 3:
                 model_pred = model_pred[:, -1, :]
 
@@ -294,3 +346,11 @@ class DiffusionAgent(BaseAgent):
         if self.use_ema:
             self.ema_helper.restore(self.model.parameters())
         torch.save(self.model.state_dict(), os.path.join(store_path, "non_ema_model_state_dict.pth"))
+
+    def reset(self):
+        """ Resets the context of the model."""
+        self.obs_context.clear()
+        
+        self.bp_image_context.clear()
+        self.inhand_image_context.clear()
+        self.des_robot_pos_context.clear()

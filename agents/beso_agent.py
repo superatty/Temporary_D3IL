@@ -20,13 +20,59 @@ import agents.models.beso.agents.diffusion_agents.k_diffusion.utils as utils
 # A logger for this file
 log = logging.getLogger(__name__)
 
+class BesoPolicy(nn.Module):
+    def __init__(self, model: DictConfig, obs_encoder: DictConfig, visual_input: bool = False, device: str = "cpu"):
+        super(BesoPolicy, self).__init__()
+
+        self.visual_input = visual_input
+
+        self.obs_encoder = hydra.utils.instantiate(obs_encoder).to(device)
+
+        self.model = hydra.utils.instantiate(model).to(device)
+
+    def get_embedding(self, inputs):
+
+        if self.visual_input:
+            agentview_image, in_hand_image, state = inputs
+
+            B, T, C, H, W = agentview_image.size()
+
+            agentview_image = agentview_image.view(B * T, C, H, W)
+            in_hand_image = in_hand_image.view(B * T, C, H, W)
+            state = state.view(B * T, -1)
+
+            obs_dict = {"agentview_image": agentview_image,
+                        "in_hand_image": in_hand_image,
+                        "robot_ee_pos": state}
+
+            obs = self.obs_encoder(obs_dict)
+            obs = obs.view(B, T, -1)
+
+        else:
+            obs = self.obs_encoder(inputs)
+
+        return obs
+
+    def loss(self, inputs, action=None, goal=None, noise=None, sigma=None):
+
+        obs = self.get_embedding(inputs)
+        return self.model.loss(obs, action, goal, noise, sigma)
+
+    def forward(self, inputs, action, goal, sigma, extra_args=None):
+        # make prediction
+        pred = self.model(inputs, action, goal, sigma)
+
+        return pred
+
+    def get_params(self):
+        return self.parameters()
+
 
 class BesoAgent(BaseAgent):
 
     def __init__(
             self,
             model: DictConfig,
-            # input_encoder: DictConfig,
             optimization: DictConfig,
             trainset: DictConfig,
             valset: DictConfig,
@@ -36,7 +82,6 @@ class BesoAgent(BaseAgent):
             device: str,
             epoch: int,
             scale_data,
-            # train_method: str,
             use_ema: bool,
             goal_conditioned: bool,
             pred_last_action_only: bool,
@@ -58,8 +103,6 @@ class BesoAgent(BaseAgent):
             patience: int = 10,
             eval_every_n_epochs: int = 50
     ):
-        # super().__init__(model, input_encoder, optimization, obs_modalities, goal_modalities, target_modality, device,
-        #                  max_train_steps, eval_every_n_steps, max_epochs)
 
         super().__init__(model, trainset=trainset, valset=valset, train_batch_size=train_batch_size,
                          val_batch_size=val_batch_size, num_workers=num_workers, device=device,
@@ -87,9 +130,6 @@ class BesoAgent(BaseAgent):
         # define the goal conditioned flag for the model
         self.gc = goal_conditioned
         # define the training method
-        # self.train_method = train_method
-
-        # self.epochs = max_epochs
 
         # all diffusion stuff for inference
         self.sampler_type = sampler_type
@@ -112,6 +152,11 @@ class BesoAgent(BaseAgent):
         # bool if the model should only output the last action or all actions in a sequence
         self.pred_last_action_only = pred_last_action_only
         # set up the rolling window contexts
+
+        self.bp_image_context = deque(maxlen=self.window_size)
+        self.inhand_image_context = deque(maxlen=self.window_size)
+        self.des_robot_pos_context = deque(maxlen=self.window_size)
+
         self.obs_context = deque(maxlen=self.window_size)
         self.goal_context = deque(maxlen=self.goal_window_size)
         # if we use DiffusionGPT we need an action context and use deques to store the actions
@@ -121,77 +166,62 @@ class BesoAgent(BaseAgent):
         self.use_kde = use_kde
         self.noise_scheduler = 'linear' # exponential or linear
 
-    def train_agent(self):
-        """
-        Train the agent on a given number of epochs
-        """
-        self.step = 0
-        # interrupt_training = False
-        best_test_mse = 1e10
-        mean_mse = 1e10
+    # def train_agent(self):
+    #     """
+    #     Train the agent on a given number of epochs
+    #     """
+    #     self.step = 0
+    #     # interrupt_training = False
+    #     best_test_mse = 1e10
+    #     mean_mse = 1e10
 
-        for num_epoch in tqdm(range(self.epoch)):
+    #     for num_epoch in tqdm(range(self.epoch)):
 
-            # run a test batch every n steps
-            if not (num_epoch + 1) % self.eval_every_n_epochs:
+    #         # run a test batch every n steps
+    #         if not (num_epoch + 1) % self.eval_every_n_epochs:
 
-                test_mse = []
-                for data in self.test_dataloader:
+    #             test_mse = []
+    #             for data in self.test_dataloader:
 
-                    state, action, mask = data
-                    mean_mse = self.evaluate(state, action)
-                    test_mse.append(mean_mse)
+    #                 state, action, mask = data
+    #                 mean_mse = self.evaluate(state, action)
+    #                 test_mse.append(mean_mse)
 
-                avrg_test_mse = sum(test_mse) / len(test_mse)
+    #             avrg_test_mse = sum(test_mse) / len(test_mse)
 
-                log.info("Epoch {}: Mean test mse is {}".format(num_epoch, avrg_test_mse))
-                if avrg_test_mse < best_test_mse:
-                    best_test_mse = avrg_test_mse
-                    self.store_model_weights(self.working_dir, sv_name=self.eval_model_name)
+    #             log.info("Epoch {}: Mean test mse is {}".format(num_epoch, avrg_test_mse))
+    #             if avrg_test_mse < best_test_mse:
+    #                 best_test_mse = avrg_test_mse
+    #                 self.store_model_weights(self.working_dir, sv_name=self.eval_model_name)
 
-                    wandb.log(
-                        {
-                            "best_test_mse": best_test_mse,
-                            "best_model_epochs": num_epoch
-                        }
-                    )
+    #                 wandb.log(
+    #                     {
+    #                         "best_test_mse": best_test_mse,
+    #                         "best_model_epochs": num_epoch
+    #                     }
+    #                 )
 
-                    log.info('New best test loss. Stored weights have been updated!')
+    #                 log.info('New best test loss. Stored weights have been updated!')
 
-            train_loss = []
-            for data in self.train_dataloader:
+    #         train_loss = []
+    #         for data in self.train_dataloader:
 
-                state, action, mask = data
-                batch_loss = self.train_step(state, action)
+    #             state, action, mask = data
+    #             batch_loss = self.train_step(state, action)
 
-                train_loss.append(batch_loss)
+    #             train_loss.append(batch_loss)
 
-                wandb.log(
-                    {
-                        "loss": batch_loss,
-                    }
-                )
+    #             wandb.log(
+    #                 {
+    #                     "loss": batch_loss,
+    #                 }
+    #             )
 
-        self.store_model_weights(self.working_dir, sv_name=self.last_model_name)
+    #     self.store_model_weights(self.working_dir, sv_name=self.last_model_name)
 
-        log.info("Training done!")
+    #     log.info("Training done!")
 
     def train_step(self, state: torch.Tensor, action: torch.Tensor, goal: Optional[torch.Tensor] = None):
-        """
-        Performs a single training step using the provided batch of data.
-
-        Args:
-            batch (dict): A dictionary containing the training data.
-        Returns:
-            float: The value of the loss function after the training step.
-        Raises:
-            None
-        """
-        # # scale data if necessarry, otherwise the scaler will return unchanged values
-        # state, action, goal = self.process_batch(batch, predict=False)
-
-        state = self.scaler.scale_input(state)
-        action = self.scaler.scale_output(action)
         if goal is not None:
             goal = self.scaler.scale_input(goal)
 
@@ -218,23 +248,6 @@ class BesoAgent(BaseAgent):
 
     @torch.no_grad()
     def evaluate(self, state: torch.tensor, action: torch.tensor, goal: Optional[torch.Tensor] = None):
-        """
-        Evaluates the model using the provided batch of data and returns the mean squared error (MSE) loss.
-
-        Args:
-            batch (dict): A dictionary containing the evaluation data
-        Returns:
-            float: The total mean squared error (MSE) loss.
-        Raises:
-            None
-        """
-        total_mse = 0
-        # # scale data if necessary, otherwise the scaler will return unchanged values
-        # state, action, goal = self.process_batch(batch, predict=True)
-
-        state = self.scaler.scale_input(state)
-        action = self.scaler.scale_output(action)
-
         if goal is not None:
             goal = self.scaler.scale_input(goal)
 
@@ -258,59 +271,14 @@ class BesoAgent(BaseAgent):
 
         return loss.item()
 
-    # @torch.no_grad()
-    # def evaluate(self, state: torch.tensor, action: torch.tensor, goal: Optional[torch.Tensor] = None):
-    #     """
-    #     Evaluates the model using the provided batch of data and returns the mean squared error (MSE) loss.
-    #
-    #     Args:
-    #         batch (dict): A dictionary containing the evaluation data
-    #     Returns:
-    #         float: The total mean squared error (MSE) loss.
-    #     Raises:
-    #         None
-    #     """
-    #     total_mse = 0
-    #     # # scale data if necessary, otherwise the scaler will return unchanged values
-    #     # state, action, goal = self.process_batch(batch, predict=True)
-    #
-    #     state = self.scaler.scale_input(state)
-    #     action = self.scaler.scale_output(action)
-    #
-    #     if goal is not None:
-    #         goal = self.scaler.scale_input(goal)
-    #
-    #     # use the EMA model variant
-    #     if self.use_ema:
-    #         self.ema_helper.store(self.model.parameters())
-    #         self.ema_helper.copy_to(self.model.parameters())
-    #
-    #     self.model.eval()
-    #     self.model.training = False
-    #     # get the sigma distribution for sampling based on Karras et al. 2022
-    #     sigmas = get_sigmas_exponential(self.num_sampling_steps, self.sigma_min, self.sigma_max, self.device)
-    #
-    #     x = torch.randn_like(action) * self.sigma_max
-    #     # generate the action based on the chosen sampler type
-    #     x_0 = self.sample_loop(sigmas, x, state, goal, self.sampler_type)
-    #     # x_0 = self.scaler.clip_action(x_0)
-    #
-    #     if self.pred_last_action_only:
-    #         x_0 = einops.rearrange(x_0, 'b d -> b 1 d')  # only train the last timestep
-    #
-    #     mse = nn.functional.mse_loss(x_0, action, reduction="none")
-    #     total_mse += mse.mean().item()
-    #     # if get_mean is not None:
-    #     #    print(f'Average STD for the action predictions: {torch.stack(pred_list).std()}')
-    #     # restore the previous model parameters
-    #     if self.use_ema:
-    #         self.ema_helper.restore(self.model.parameters())
-    #     return total_mse
-
     def reset(self):
-        """ Resets the context of the model."""
-        self.obs_context.clear()
-        self.action_context.clear()
+            """ Resets the context of the model."""
+            self.obs_context.clear()
+            self.action_context.clear()
+
+            self.bp_image_context.clear()
+            self.inhand_image_context.clear()
+            self.des_robot_pos_context.clear()
 
     @torch.no_grad()
     def predict(
@@ -321,7 +289,8 @@ class BesoAgent(BaseAgent):
             get_mean=None,
             new_sampling_steps=None,
             extra_args=None,
-            noise_scheduler=None
+            noise_scheduler=None,
+            if_vision=False
     ) -> torch.Tensor:
         """
         Predicts the output of the model based on the provided batch of data.
@@ -342,16 +311,44 @@ class BesoAgent(BaseAgent):
 
         # state, goal, _ = self.process_batch(batch, predict=True)
 
-        state = torch.from_numpy(state).float().to(self.device).unsqueeze(0)
-        state = self.scaler.scale_input(state)
+        if if_vision:
+            bp_image, inhand_image, des_robot_pos = state
+
+            bp_image = torch.from_numpy(bp_image).to(self.device).float().unsqueeze(0)
+            inhand_image = torch.from_numpy(inhand_image).to(self.device).float().unsqueeze(0)
+            des_robot_pos = torch.from_numpy(des_robot_pos).to(self.device).float().unsqueeze(0)
+
+            des_robot_pos = self.scaler.scale_input(des_robot_pos)
+
+            self.bp_image_context.append(bp_image)
+            self.inhand_image_context.append(inhand_image)
+            self.des_robot_pos_context.append(des_robot_pos)
+
+            bp_image_seq = torch.stack(tuple(self.bp_image_context), dim=1)
+            inhand_image_seq = torch.stack(tuple(self.inhand_image_context), dim=1)
+            des_robot_pos_seq = torch.stack(tuple(self.des_robot_pos_context), dim=1)
+
+            input_state = (bp_image_seq, inhand_image_seq, des_robot_pos_seq)
+
+            input_state = self.model.get_embedding(input_state)
+
+        else:
+            state = torch.from_numpy(state).float().to(self.device).unsqueeze(0)
+            state = self.scaler.scale_input(state)
+            if goal is not None:
+                goal = self.scaler.scale_input(goal)
+
+                if len(goal.shape) == 2 and self.window_size > 1:
+                    goal = einops.rearrange(goal, 'b d -> 1 b d')
+
+            self.obs_context.append(state)
+            input_state = torch.stack(tuple(self.obs_context), dim=1)
+            
         if goal is not None:
             goal = self.scaler.scale_input(goal)
 
             if len(goal.shape) == 2 and self.window_size > 1:
                 goal = einops.rearrange(goal, 'b d -> 1 b d')
-
-        self.obs_context.append(state)
-        input_state = torch.stack(tuple(self.obs_context), dim=1)
 
         # if len(state.shape) == 2 and self.window_size > 1:
         #     self.obs_context.append(state)
@@ -390,29 +387,6 @@ class BesoAgent(BaseAgent):
             if len(self.action_context) > 0:
                 previous_a = torch.cat(tuple(self.action_context), dim=1)
                 x = torch.cat([previous_a, x], dim=1)
-
-        # # adept for time sequence if chosen
-        # if self.window_size > 1:
-        #     # depending if we use a single sample or the mean over n samples
-        #     if get_mean is not None:
-        #         x = torch.randn((len(input_state) * get_mean, 1, self.scaler.y_bounds.shape[1]),
-        #                         device=self.device) * self.sigma_max
-        #     else:
-        #         x = torch.randn((len(input_state), 1, self.scaler.y_bounds.shape[1]),
-        #                         device=self.device) * self.sigma_max
-        #         # check if we need to get thew hole action context for the DiffusionGPT model variant
-        #
-        #         if len(self.action_context) > 0:
-        #             previous_a = torch.cat(tuple(self.action_context), dim=1)
-        #             x = torch.cat([previous_a, x], dim=1)
-        # else:
-        #     if get_mean is not None:
-        #         x = torch.randn((len(input_state) * get_mean, self.scaler.y_bounds.shape[1]),
-        #                         device=self.device) * self.sigma_max
-        #
-        #     else:
-        #         x = torch.randn((len(input_state), 1, self.scaler.y_bounds.shape[1]),
-        #                         device=self.device) * self.sigma_max
 
         x_0 = self.sample_loop(sigmas, x, input_state, goal, sampler_type, {})
 

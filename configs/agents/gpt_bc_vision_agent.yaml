@@ -1,8 +1,8 @@
-_target_: agents.gpt_bc_vision_agent.Gpt_Agent
+_target_: agents.gpt_bc_agent.GPT_BC_Agent
 _recursive_: false
 
 model:
-  _target_: agents.gpt_bc_vision_agent.GptPolicy
+  _target_: agents.gpt_bc_agent.GPT_BC_Policy
   _recursive_: false
 
   visual_input: True
@@ -36,32 +36,16 @@ model:
         in_hand_image:
           shape: [ 3, 96, 96 ]
           type: rgb
-    #        robot_ee_pos:
-    #          shape: [3]
-    #          type default: low_dim
-    #      robot0_eef_quat:
-    #        shape: [4]
-    #      robot0_gripper_qpos:
-    #        shape: [2]
-    #    action:
-    #      shape: [10]
 
     rgb_model:
       _target_: agents.models.vision.model_getter.get_resnet
       input_shape: [3, 96, 96]
       output_size: 64
     resize_shape: null
-#    crop_shape: [ 84, 84 ]
-    # constant center crop
     random_crop: False
     use_group_norm: True
     share_rgb_model: False
     imagenet_norm: True
-
-#  obs_encoder:
-#    _target_: agents.models.common.agent_attention_encoder.AgentAttEncoder
-#    shape_meta: ${shape_meta}
-#    dim_embedding: 128
 
 trainset: ${trainset}
 valset: ${valset}

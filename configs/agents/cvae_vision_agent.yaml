@@ -1,8 +1,8 @@
-_target_: agents.cvae_vision_agent.CVAEAgent
+_target_: agents.cvae_agent.CVAE_Agent
 _recursive_: false
 
 model:
-  _target_: agents.cvae_vision_agent.CVAEPolicy
+  _target_: agents.cvae_agent.CVAE_Policy
   _recursive_: false
 
   visual_input: True
@@ -33,8 +33,6 @@ model:
       _target_: agents.models.common.mlp.ResidualMLPNetwork
       _recursive_: false
       input_dim: 128 #${obs_dim}
-      #    hidden_dim: ${hidden_dim}
-      #    num_hidden_layers: ${num_hidden_layers}
       output_dim: ${action_dim}
       dropout: 0
       activation: "Mish"
@@ -54,25 +52,12 @@ model:
         in_hand_image:
           shape: [3, 96, 96]
           type: rgb
-#        robot_ee_pos:
-#          shape: [3]
-#          type default: low_dim
-    #      robot0_eef_quat:
-    #        shape: [4]
-    #      robot0_gripper_qpos:
-    #        shape: [2]
-    #    action:
-    #      shape: [10]
 
     rgb_model:
       _target_: agents.models.vision.model_getter.get_resnet
       input_shape: [3, 96, 96]
       output_size: 64
-#      name: resnet18
-#      weights: null
     resize_shape: null
-#    crop_shape: [76, 76]
-    # constant center crop
     random_crop: False
     use_group_norm: True
     share_rgb_model: False
@@ -89,11 +74,6 @@ optimization:
   betas: [0.95, 0.999]
   eps: 1.0e-8
   weight_decay: 1.0e-6
-
-#optimization:
-#  _target_: torch.optim.Adam
-#  lr: 1e-4
-#  weight_decay: 0
 
 train_batch_size: ${train_batch_size}
 val_batch_size: ${val_batch_size}

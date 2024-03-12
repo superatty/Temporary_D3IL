@@ -17,8 +17,54 @@ from agents.models.ibc.samplers.noise_sampler import NoiseSampler
 # A logger for this file
 log = logging.getLogger(__name__)
 
+class IBC_Policy(nn.Module):
+    def __init__(self, model: DictConfig, obs_encoder: DictConfig, visual_input: bool = False, device: str = 'cpu'):
+        super(IBC_Policy, self).__init__()
 
-class IBCAgent(BaseAgent):
+        self.visual_input = visual_input
+
+        self.obs_encoder = hydra.utils.instantiate(obs_encoder).to(device)
+
+        self.model = hydra.utils.instantiate(model).to(device)
+
+    def get_embedding(self, inputs):
+
+        if self.visual_input:
+            agentview_image, in_hand_image, state = inputs
+
+            B, T, C, H, W = agentview_image.size()
+
+            agentview_image = agentview_image.view(B * T, C, H, W)
+            in_hand_image = in_hand_image.view(B * T, C, H, W)
+            state = state.view(B * T, -1)
+
+            obs_dict = {"agentview_image": agentview_image,
+                        "in_hand_image": in_hand_image,
+                        "robot_ee_pos": state}
+
+            obs = self.obs_encoder(obs_dict)
+            obs = obs.view(B, T, -1)
+
+        else:
+            obs = self.obs_encoder(inputs)
+
+        return obs
+
+    def forward(self, inputs):
+        # encode state and visual inputs
+        # the encoder should be shared by all the baselines
+
+        obs = self.get_embedding(inputs)
+
+        # make prediction
+        pred = self.model(obs)
+
+        return pred
+
+    def get_params(self):
+        return self.parameters()
+
+class IBC_Agent(BaseAgent):
 
     def __init__(
             self,
@@ -33,7 +79,6 @@ class IBCAgent(BaseAgent):
             epoch: int,
             scale_data,
             eval_every_n_epochs,
-
             lr_scheduler: DictConfig,
             sampler: DictConfig,
             loss_type: str = "info_nce",
@@ -90,107 +135,105 @@ class IBCAgent(BaseAgent):
         """
         self.sampler.get_bounds(scaler)
 
-    def train_agent(self):
+    # def train_agent(self):
 
-        best_test_mse = 1e10
-        mean_mse = 1e10
+    #     best_test_mse = 1e10
+    #     mean_mse = 1e10
 
-        for num_epoch in tqdm(range(self.epoch)):
+    #     for num_epoch in tqdm(range(self.epoch)):
 
-            # run a test batch every n epochs
-            if not (num_epoch+1) % self.eval_every_n_epochs:
+    #         # run a test batch every n epochs
+    #         if not (num_epoch+1) % self.eval_every_n_epochs:
 
-                test_mse = []
-                for data in self.test_dataloader:
-                    if self.goal_conditioning:
-                        state, action, mask, goal = data
-                    else:
-                        state, action, mask = data
-                        goal = None
+    #             test_mse = []
+    #             for data in self.test_dataloader:
+    #                 if self.goal_conditioning:
+    #                     state, action, mask, goal = data
+    #                 else:
+    #                     state, action, mask = data
+    #                     goal = None
 
-                    mean_mse = self.evaluate(state, action, goal)
-                    test_mse.append(mean_mse)
+    #                 mean_mse = self.evaluate(state, action, goal)
+    #                 test_mse.append(mean_mse)
 
-                avrg_test_mse = sum(test_mse) / len(test_mse)
+    #             avrg_test_mse = sum(test_mse) / len(test_mse)
 
-                log.info("Epoch {}: Mean test mse is {}".format(num_epoch, avrg_test_mse))
+    #             log.info("Epoch {}: Mean test mse is {}".format(num_epoch, avrg_test_mse))
 
-                if avrg_test_mse < best_test_mse:
-                    best_test_mse = avrg_test_mse
-                    self.store_model_weights(self.working_dir, sv_name=self.eval_model_name)
+    #             if avrg_test_mse < best_test_mse:
+    #                 best_test_mse = avrg_test_mse
+    #                 self.store_model_weights(self.working_dir, sv_name=self.eval_model_name)
 
-                    wandb.log(
-                        {
-                            "best_model_epochs": num_epoch
-                        }
-                    )
+    #                 wandb.log(
+    #                     {
+    #                         "best_model_epochs": num_epoch
+    #                     }
+    #                 )
 
-                    log.info('New best test loss. Stored weights have been updated!')
+    #                 log.info('New best test loss. Stored weights have been updated!')
 
-            epoch_loss = 0
-            mse_neg_loss = 0
+    #         epoch_loss = 0
+    #         mse_neg_loss = 0
 
-            # epoch training
-            for i, inputs in enumerate(self.train_dataloader):
-                if self.goal_conditioning:
-                    state, action, mask, goal = inputs
-                else:
-                    state, action, mask = inputs
-                    goal = None
+    #         # epoch training
+    #         for i, inputs in enumerate(self.train_dataloader):
+    #             if self.goal_conditioning:
+    #                 state, action, mask, goal = inputs
+    #             else:
+    #                 state, action, mask = inputs
+    #                 goal = None
 
-                batch_loss, loss_info = self.train_step(state, action, goal)  # TODO get mean of loss/grad info
-                batch_loss = batch_loss.detach().cpu().numpy()
+    #             batch_loss, loss_info = self.train_step(state, action, goal)  # TODO get mean of loss/grad info
+    #             batch_loss = batch_loss.detach().cpu().numpy()
 
-                epoch_loss += batch_loss
-                mse_neg_loss += loss_info['mse_neg_true_examples']
-                intern_step = i
-                self.next_step = False
+    #             epoch_loss += batch_loss
+    #             mse_neg_loss += loss_info['mse_neg_true_examples']
+    #             intern_step = i
+    #             self.next_step = False
 
-            self.steps += 1
+    #         self.steps += 1
 
-            epoch_loss = epoch_loss / intern_step
-            mse_neg_loss = mse_neg_loss / intern_step
-            log.info("Epoch {}: Mean epoch loss mse is {}".format(num_epoch, epoch_loss))
-            log.info("MSE value for negative samples: {}".format(mse_neg_loss))
-            loss_info['mse_neg_true_examples'] = mse_neg_loss
-            # # log.info loss every x steps
-            # if not self.steps % self.eval_every_n_steps or self.steps == 1:
-            #     log_step = int(self.steps / self.eval_every_n_steps)
-            #     print("logging step: ", log_step)
-            #     wandb.log(loss_info, step=log_step)
+    #         epoch_loss = epoch_loss / intern_step
+    #         mse_neg_loss = mse_neg_loss / intern_step
+    #         log.info("Epoch {}: Mean epoch loss mse is {}".format(num_epoch, epoch_loss))
+    #         log.info("MSE value for negative samples: {}".format(mse_neg_loss))
+    #         loss_info['mse_neg_true_examples'] = mse_neg_loss
+    #         # # log.info loss every x steps
+    #         # if not self.steps % self.eval_every_n_steps or self.steps == 1:
+    #         #     log_step = int(self.steps / self.eval_every_n_steps)
+    #         #     print("logging step: ", log_step)
+    #         #     wandb.log(loss_info, step=log_step)
 
-            if not (num_epoch + 1) % self.eval_every_n_epochs:
+    #         if not (num_epoch + 1) % self.eval_every_n_epochs:
 
-                wandb.log(
-                    {
-                        "epoch_loss": epoch_loss,
-                        "test_loss": avrg_test_mse
-                    }
-                )
+    #             wandb.log(
+    #                 {
+    #                     "epoch_loss": epoch_loss,
+    #                     "test_loss": avrg_test_mse
+    #                 }
+    #             )
 
-        self.store_model_weights(self.working_dir, sv_name=self.last_model_name)
-        log.info("Training done!")
+    #     self.store_model_weights(self.working_dir, sv_name=self.last_model_name)
+    #     log.info("Training done!")
 
     def train_step(self, state: torch.Tensor, action: torch.Tensor, goal: Optional[torch.Tensor] = None):
         # move state to the chosen devices
         if goal is not None:
             goal = self.scaler.scale_input(goal)
 
-        # scale data if necessarry, otherwise the scaler will return unchanged values
-        state = self.scaler.scale_input(state)
-        action = self.scaler.scale_output(action)
-
         # Generate N negatives, one for each element in the batch B with dimensions D: (B, N, D).
         # use the sampler class chosen in the config
+        
+        state_embedding = self.model.get_embedding(state)
 
         if isinstance(self.sampler, LangevinMCMCSampler):
             negatives = self.sampler.gen_train_samples(
-                state.size(0), self.model, state, goal, random_start_points=True
+                state_embedding.size(0), self.model.model, state_embedding, goal, random_start_points=True
             )
         elif isinstance(self.sampler, NoiseSampler):
-            negatives = self.sampler.gen_train_samples(state.size(0), self.model, state, action, goal, self.steps)
+            negatives = self.sampler.gen_train_samples(state_embedding.size(0), self.model.model, state_embedding, action, goal, self.steps)
         else:
-            negatives = self.sampler.gen_train_samples(state.size(0), self.model, state)
+            negatives = self.sampler.gen_train_samples(state_embedding.size(0), self.model.model, state_embedding)
         if self.use_ema:
             self.ema_helper.restore(self.model.parameters())
 
@@ -200,7 +243,7 @@ class IBCAgent(BaseAgent):
         # Merge action and negatives: (B, N+1, D).
         # the action action will be located at (B, 0, D) and the negatives at (B, 1:, D)
         actions = torch.cat([action, negatives], dim=1)
-        loss, dict_info = self.compute_loss(state, actions, goal)
+        loss, dict_info = self.compute_loss(state_embedding, actions, goal)
 
         # optimize the model based on the loss
         self.optimizer.zero_grad(set_to_none=True)
@@ -216,7 +259,8 @@ class IBCAgent(BaseAgent):
         dict_info['mse_neg_true_examples'] = mse_loss_value
         dict_info['model_learning_rate'] = self.lr_scheduler.get_last_lr()[0]
 
-        return loss, dict_info
+        # return loss, dict_info
+        return loss
 
     def evaluate(self, state: torch.Tensor, action: torch.Tensor, goal: Optional[torch.Tensor] = None):
 
@@ -225,17 +269,13 @@ class IBCAgent(BaseAgent):
         if goal is not None:
             goal = self.scaler.scale_input(goal)
 
-        # scale data if necessarry, otherwise the scaler will return unchanged values
-        state = self.scaler.scale_input(state)
-        action = self.scaler.scale_output(action)
-
         if self.use_ema:
             self.ema_helper.store(self.model.parameters())
             self.ema_helper.copy_to(self.model.parameters())
 
         state = state.to(self.device)
         action = action.to(self.device)
-        out = self.sampler.infer(state, self.model, goal)
+        out = self.sampler.infer(state, self.model.model, goal)
 
         action = einops.rearrange(action, 'b a n -> (b a) n')
         mse = F.mse_loss(out, action, reduction="none").mean()
@@ -245,7 +285,7 @@ class IBCAgent(BaseAgent):
             self.ema_helper.restore(self.model.parameters())
         return mse.detach().item()
 
-    def predict(self, state: torch.Tensor, goal: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def predict(self, state: torch.Tensor, goal: Optional[torch.Tensor] = None, if_vision=False) -> torch.Tensor:
         """
         Method for predicting one step with state data using the stochastic optimizer instance to generate
         samples and return the best sample with the lowest energy
@@ -256,9 +296,23 @@ class IBCAgent(BaseAgent):
         # scale data if necessarry, otherwise returns unchanged values
 
         self.model.eval()
-        state = torch.from_numpy(state).float().to(self.device).unsqueeze(0)
+        
+        if if_vision:
+            bp_image, inhand_image, des_robot_pos = state
 
-        state = self.scaler.scale_input(state)
+            bp_image = torch.from_numpy(bp_image).to(self.device).float().unsqueeze(0).unsqueeze(0)
+            inhand_image = torch.from_numpy(inhand_image).to(self.device).float().unsqueeze(0).unsqueeze(0)
+            des_robot_pos = torch.from_numpy(des_robot_pos).to(self.device).float().unsqueeze(0).unsqueeze(0)
+
+            des_robot_pos = self.scaler.scale_input(des_robot_pos)
+
+            state = (bp_image, inhand_image, des_robot_pos)
+
+        else:
+            state = torch.from_numpy(state).float().to(self.device).unsqueeze(0).unsqueeze(0)
+            state = self.scaler.scale_input(state)
+            
+        state = self.model.get_embedding(state)
 
         if not self.goal_conditioning:
             goal = None
@@ -267,17 +321,15 @@ class IBCAgent(BaseAgent):
             goal = self.scaler.scale_input(goal)
             goal = goal.to(self.device)
 
-        state = state.to(self.device)
-
         if self.use_ema:
             self.ema_helper.store(self.model.parameters())
             self.ema_helper.copy_to(self.model.parameters())
         # if we use Langevin MCMC we still need the gradient therefore model.eval() is not called
         if self.sampler == "DerivativeFreeOptimizer":
             self.model.eval()
-            out = self.sampler.infer(state, self.model, goal)
+            out = self.sampler.infer(state, self.model.model, goal)
         else:
-            out = self.sampler.infer(state, self.model, goal)
+            out = self.sampler.infer(state, self.model.model, goal)
 
         if self.use_ema:
             self.ema_helper.restore(self.model.parameters())
@@ -293,12 +345,12 @@ class IBCAgent(BaseAgent):
             goal = einops.rearrange(goal, 'b a n -> (b a) n')
 
         if self.use_grad_norm:
-            _, grad_norm, _ = self.sampler.compute_gradient(self.model, state, actions, goal, False)
+            _, grad_norm, _ = self.sampler.compute_gradient(self.model.model, state, actions, goal, False)
             grad_norm_loss = compute_gradient_loss(grad_norm)
 
         if self.loss_type == "info_nce":
             info_nce_loss, loss_dict = compute_info_nce_loss(
-                ebm=self.model,
+                ebm=self.model.model,
                 state=state, actions=actions,
                 device=self.device,
                 avrg_e_regularization=self.avrg_e_regularization,
@@ -314,7 +366,7 @@ class IBCAgent(BaseAgent):
 
         elif self.loss_type == "cd":
             loss = contrastive_divergence(
-                ebm=self.model,
+                ebm=self.model.model,
                 state=state,
                 actions=actions,
                 avrg_e_regularization=self.avrg_e_regularization
@@ -325,7 +377,7 @@ class IBCAgent(BaseAgent):
 
         elif self.loss_type == "cd_kl":
             loss = contrastive_divergence_kl(
-                ebm=self.model,
+                ebm=self.model.model,
                 state=state, actions=actions,
                 avrg_e_regularization=self.avrg_e_regularization,
                 kl_loss_factor=self.kl_loss_factor
@@ -333,12 +385,12 @@ class IBCAgent(BaseAgent):
 
         elif self.loss_type == 'cd_entropy':
             loss = contrastive_divergence_entropy_approx(
-                ebm=self.model,
+                ebm=self.model.model,
                 state=state, actions=actions,
             )
         elif self.loss_type == 'autoregressive_info_nce':
             loss = compute_autoregressive_info_nce_loss(
-                ebm=self.model,
+                ebm=self.model.model,
                 state=state, actions=actions,
                 device=self.device,
                 avrg_e_regularization=self.avrg_e_regularization

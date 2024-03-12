@@ -20,7 +20,7 @@ import agents.models.bet.utils as utils
 log = logging.getLogger(__name__)
 
 
-class GptPolicy(nn.Module):
+class GPT_BC_Policy(nn.Module):
 
     def __init__(self,
                  model: DictConfig,
@@ -28,7 +28,7 @@ class GptPolicy(nn.Module):
                  visual_input: bool = False,
                  device: str = 'cpu'):
 
-        super(GptPolicy, self).__init__()
+        super(GPT_BC_Policy, self).__init__()
 
         self.visual_input = visual_input
 
@@ -51,9 +51,6 @@ class GptPolicy(nn.Module):
             in_hand_image = in_hand_image.view(B * T, C, H, W)
             state = state.view(B * T, -1)
 
-            # bp_imgs = einops.rearrange(bp_imgs, "B T C H W -> (B T) C H W")
-            # inhand_imgs = einops.rearrange(inhand_imgs, "B T C H W -> (B T) C H W")
-
             obs_dict = {"agentview_image": agentview_image,
                         "in_hand_image": in_hand_image,
                         "robot_ee_pos": state}
@@ -75,7 +72,7 @@ class GptPolicy(nn.Module):
 
 
 
-class Gpt_Agent(BaseAgent):
+class GPT_BC_Agent(BaseAgent):
     def __init__(
             self,
             model: DictConfig,
@@ -95,12 +92,18 @@ class Gpt_Agent(BaseAgent):
                          val_batch_size=val_batch_size, num_workers=num_workers, device=device,
                          epoch=epoch, scale_data=scale_data, eval_every_n_epochs=eval_every_n_epochs)
 
+        # Define the number of GPUs available
+        num_gpus = torch.cuda.device_count()
+
+        # Check if multiple GPUs are available and select the appropriate device
+        if num_gpus > 1:
+            print(f"Using {num_gpus} GPUs for training.")
+            self.model = nn.DataParallel(self.model)
+
         self.min_action = torch.from_numpy(self.scaler.y_bounds[0, :]).to(self.device)
         self.max_action = torch.from_numpy(self.scaler.y_bounds[1, :]).to(self.device)
 
-        self.optimizer = hydra.utils.instantiate(
-            optimization, params=self.model.get_params()
-        )
+        self.optimizer = hydra.utils.instantiate(optimization, params=self.model.parameters())
 
         self.eval_model_name = "eval_best_gpt.pth"
         self.last_model_name = "last_gpt.pth"
@@ -109,71 +112,75 @@ class Gpt_Agent(BaseAgent):
 
         self.obs_context = deque(maxlen=self.window_size)
 
-    def train_agent(self):
+        self.bp_image_context = deque(maxlen=self.window_size)
+        self.inhand_image_context = deque(maxlen=self.window_size)
+        self.des_robot_pos_context = deque(maxlen=self.window_size)
 
-        best_test_loss = 1e10
+    # def train_agent(self):
 
-        # for step in tqdm(range(self.max_train_steps)):
-        for num_epoch in tqdm(range(self.epoch)):
+    #     best_test_loss = 1e10
 
-            train_loss = []
+    #     # for step in tqdm(range(self.max_train_steps)):
+    #     for num_epoch in tqdm(range(self.epoch)):
 
-            for data in self.train_dataloader:
+    #         train_loss = []
 
-                observations, action, mask = data
+    #         for data in self.train_dataloader:
 
-                loss = self.train_step(observations, action)
+    #             observations, action, mask = data
 
-                train_loss.append(loss)
+    #             loss = self.train_step(observations, action)
 
-                wandb.log(
-                    {
-                        "train_loss": loss
-                    }
-                )
-            avrg_train_loss = sum(train_loss) / len(train_loss)
-            log.info("Epoch {}: Average train loss is {}".format(num_epoch, avrg_train_loss))
+    #             train_loss.append(loss)
 
-            ####################################################################
-            # evaluate the model
-            if not (num_epoch+1) % self.eval_every_n_epochs:
+    #             wandb.log(
+    #                 {
+    #                     "train_loss": loss
+    #                 }
+    #             )
+    #         avrg_train_loss = sum(train_loss) / len(train_loss)
+    #         log.info("Epoch {}: Average train loss is {}".format(num_epoch, avrg_train_loss))
 
-                test_loss = []
-                for data in self.test_dataloader:
+    #         ####################################################################
+    #         # evaluate the model
+    #         if not (num_epoch+1) % self.eval_every_n_epochs:
 
-                    observations, action, mask = data
-                    loss = self.evaluate(observations, action)
+    #             test_loss = []
+    #             for data in self.test_dataloader:
 
-                    test_loss.append(loss)
-                    wandb.log(
-                        {
-                            "test_loss": loss,
-                        }
-                    )
+    #                 observations, action, mask = data
+    #                 loss = self.evaluate(observations, action)
 
-                avrg_test_loss = sum(test_loss) / len(test_loss)
-                log.info("Epoch {}: Average test loss is {}".format(num_epoch, avrg_test_loss))
+    #                 test_loss.append(loss)
+    #                 wandb.log(
+    #                     {
+    #                         "test_loss": loss,
+    #                     }
+    #                 )
 
-                if avrg_test_loss < best_test_loss:
-                    best_test_loss = avrg_test_loss
-                    self.store_model_weights(self.working_dir, sv_name=self.eval_model_name)
+    #             avrg_test_loss = sum(test_loss) / len(test_loss)
+    #             log.info("Epoch {}: Average test loss is {}".format(num_epoch, avrg_test_loss))
 
-                    wandb.log(
-                        {
-                            "best_model_epochs": num_epoch
-                        }
-                    )
+    #             if avrg_test_loss < best_test_loss:
+    #                 best_test_loss = avrg_test_loss
+    #                 self.store_model_weights(self.working_dir, sv_name=self.eval_model_name)
 
-                    log.info('New best test loss. Stored weights have been updated!')
+    #                 wandb.log(
+    #                     {
+    #                         "best_model_epochs": num_epoch
+    #                     }
+    #                 )
 
-                wandb.log(
-                    {
-                        "avrg_test_loss": avrg_test_loss,
-                    }
-                )
+    #                 log.info('New best test loss. Stored weights have been updated!')
 
-        self.store_model_weights(self.working_dir, sv_name=self.last_model_name)
-        log.info("Training done!")
+    #             wandb.log(
+    #                 {
+    #                     "avrg_test_loss": avrg_test_loss,
+    #                 }
+    #             )
+
+    #     self.store_model_weights(self.working_dir, sv_name=self.last_model_name)
+    #     log.info("Training done!")
 
     def train_step(self, state: torch.Tensor, actions: torch.Tensor):
         """
@@ -182,12 +189,9 @@ class Gpt_Agent(BaseAgent):
         # train the model
         self.model.train()
 
-        obs = self.scaler.scale_input(state)
-        act = self.scaler.scale_output(actions)
+        out = self.model(state)
 
-        out = self.model(obs)
-
-        loss = F.mse_loss(out, act)
+        loss = F.mse_loss(out, actions)
 
         self.optimizer.zero_grad(set_to_none=True)
         loss.backward()
@@ -202,9 +206,6 @@ class Gpt_Agent(BaseAgent):
         """
         self.model.eval()
 
-        state = self.scaler.scale_input(state)
-        action = self.scaler.scale_output(action)
-
         total_mse = 0.0
 
         out = self.model(state)
@@ -214,24 +215,37 @@ class Gpt_Agent(BaseAgent):
 
         return total_mse
 
-    def reset(self):
-        """ Resets the context of the model."""
-        self.obs_context.clear()
-
-    def predict(self, state, sample=False):
+    def predict(self, state, sample=False, if_vision=False):
 
         self.model.eval()
 
-        obs = torch.from_numpy(state).float().to(self.device).unsqueeze(0)
-        obs = self.scaler.scale_input(obs)
+        if if_vision:
+            bp_image, inhand_image, des_robot_pos = state
 
-        # Now, add to history. This automatically handles the case where
-        # the history is full.
-        self.obs_context.append(obs)
+            bp_image = torch.from_numpy(bp_image).to(self.device).float().unsqueeze(0)
+            inhand_image = torch.from_numpy(inhand_image).to(self.device).float().unsqueeze(0)
+            des_robot_pos = torch.from_numpy(des_robot_pos).to(self.device).float().unsqueeze(0)
 
-        enc_obs_seq = torch.stack(tuple(self.obs_context), dim=1)  # type: ignore
+            des_robot_pos = self.scaler.scale_input(des_robot_pos)
+
+            self.bp_image_context.append(bp_image)
+            self.inhand_image_context.append(inhand_image)
+            self.des_robot_pos_context.append(des_robot_pos)
+
+            bp_image_seq = torch.stack(tuple(self.bp_image_context), dim=1)
+            inhand_image_seq = torch.stack(tuple(self.inhand_image_context), dim=1)
+            des_robot_pos_seq = torch.stack(tuple(self.des_robot_pos_context), dim=1)
+
+            obs_seq = (bp_image_seq, inhand_image_seq, des_robot_pos_seq)
+
+        else:
+            obs = torch.from_numpy(state).float().to(self.device).unsqueeze(0)
+            obs = self.scaler.scale_input(obs)
+            self.obs_context.append(obs)
+            obs_seq = torch.stack(tuple(self.obs_context), dim=1)  # type: ignore
+
         # Sample latents from the prior
-        actions = self.model(enc_obs_seq)
+        actions = self.model(obs_seq)
 
         actions = actions.clamp_(self.min_action, self.max_action)
 
@@ -240,8 +254,12 @@ class Gpt_Agent(BaseAgent):
 
         actions = actions[:, -1]
 
-        # actions = einops.rearrange(
-        #     actions, "batch 1 action_dim -> batch action_dim"
-        # )
-
         return actions
+    
+    def reset(self):
+        """ Resets the context of the model."""
+        self.obs_context.clear()
+        
+        self.bp_image_context.clear()
+        self.des_robot_pos_context.clear()
+        self.inhand_image_context.clear()
