@@ -4,10 +4,8 @@ import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import wandb
 from omegaconf import DictConfig
 import hydra
-from tqdm import tqdm
 from typing import Optional
 
 from agents.base_agent import BaseAgent
@@ -17,11 +15,13 @@ log = logging.getLogger(__name__)
 
 class BC_Policy(nn.Module):
 
-    def __init__(self,
-                 model: DictConfig,
-                 obs_encoder: DictConfig,
-                 visual_input: bool = False,
-                 device: str = 'cpu'):
+    def __init__(
+        self,
+        model: DictConfig,
+        obs_encoder: DictConfig,
+        visual_input: bool = False,
+        device: str = "cpu",
+    ):
 
         super(BC_Policy, self).__init__()
 
@@ -31,13 +31,8 @@ class BC_Policy(nn.Module):
 
         self.model = hydra.utils.instantiate(model).to(device)
 
-    def forward(self, inputs):
-
-        # encode state and visual inputs
-        # the encoder should be shared by all the baselines
-
+    def get_embedding(self, inputs):
         if self.visual_input:
-
             agentview_image, in_hand_image, state = inputs
 
             B, T, C, H, W = agentview_image.size()
@@ -46,24 +41,30 @@ class BC_Policy(nn.Module):
             in_hand_image = in_hand_image.view(B * T, C, H, W)
             state = state.view(B * T, -1)
 
-            # bp_imgs = einops.rearrange(bp_imgs, "B T C H W -> (B T) C H W")
-            # inhand_imgs = einops.rearrange(inhand_imgs, "B T C H W -> (B T) C H W")
-
-            obs_dict = {"agentview_image": agentview_image,
-                        "in_hand_image": in_hand_image,
-                        "robot_ee_pos": state}
+            obs_dict = {
+                "agentview_image": agentview_image,
+                "in_hand_image": in_hand_image,
+                "robot_ee_pos": state,
+            }
 
             obs = self.obs_encoder(obs_dict)
             obs = obs.view(B, T, -1)
-
         else:
-
             obs = self.obs_encoder(inputs)
 
-        # make prediction
-        pred = self.model(obs)
+        return obs
 
+    def forward(self, state, goal=None):
+        if goal is not None:
+            state = torch.cat([state, goal], dim=-1)
+
+        obs = self.get_embedding(state)
+        pred = self.model(obs)
         return pred
+
+    def get_loss(self, state, action, goal=None):
+        pred = self(state, goal)
+        return F.mse_loss(pred, action)
 
     def get_params(self):
         return self.parameters()
@@ -71,22 +72,38 @@ class BC_Policy(nn.Module):
 
 class BC_Agent(BaseAgent):
     def __init__(
-            self,
-            model: DictConfig,
-            optimization: DictConfig,
-            trainset: DictConfig,
-            valset: DictConfig,
-            train_batch_size,
-            val_batch_size,
-            num_workers,
-            device: str,
-            epoch: int,
-            scale_data,
-            eval_every_n_epochs: int = 50
+        self,
+        model: DictConfig,
+        optimization: DictConfig,
+        trainset: DictConfig,
+        valset: DictConfig,
+        train_batch_size,
+        val_batch_size,
+        num_workers,
+        device: str,
+        epoch: int,
+        scale_data,
+        eval_every_n_epochs: int = 50,
+        use_ema: bool = False,
+        decay: Optional[float] = None,
+        update_ema_every_n_steps: Optional[int] = None,
     ):
-        super().__init__(model=model, trainset=trainset, valset=valset, train_batch_size=train_batch_size,
-                         val_batch_size=val_batch_size, num_workers=num_workers, device=device,
-                         epoch=epoch, scale_data=scale_data, eval_every_n_epochs=eval_every_n_epochs)
+        super().__init__(
+            model=model,
+            optimization=optimization,
+            trainset=trainset,
+            valset=valset,
+            train_batch_size=train_batch_size,
+            val_batch_size=val_batch_size,
+            num_workers=num_workers,
+            device=device,
+            epoch=epoch,
+            scale_data=scale_data,
+            eval_every_n_epochs=eval_every_n_epochs,
+            use_ema=use_ema,
+            decay=decay,
+            update_ema_every_n_steps=update_ema_every_n_steps,
+        )
 
         # Define the number of GPUs available
         num_gpus = torch.cuda.device_count()
@@ -96,57 +113,16 @@ class BC_Agent(BaseAgent):
             print(f"Using {num_gpus} GPUs for training.")
             self.model = nn.DataParallel(self.model)
 
-        self.optimizer = hydra.utils.instantiate(
-            optimization, params=self.model.parameters()
-        )
-
         self.eval_model_name = "eval_best_bc.pth"
         self.last_model_name = "last_bc.pth"
 
         self.min_action = torch.from_numpy(self.scaler.y_bounds[0, :]).to(self.device)
         self.max_action = torch.from_numpy(self.scaler.y_bounds[1, :]).to(self.device)
 
-
-    def train_step(self, state, actions: torch.Tensor, goal: Optional[torch.Tensor] = None):
-        """
-        Executes a single training step on a mini-batch of data
-        """
-        self.model.train()
-
-        if goal is not None:
-            goal = self.scaler.scale_input(goal)
-            out = self.model(torch.cat([state, goal], dim=-1))
-        else:
-            out = self.model(state)
-        loss = F.mse_loss(out, actions)
-
-        self.optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        self.optimizer.step()
-
-        return loss.item()
-
     @torch.no_grad()
-    def evaluate(self, state, action: torch.Tensor, goal: Optional[torch.Tensor] = None):
-        """
-        Method for evaluating the model on one epoch of data
-        """
-        self.model.eval()
-
-        total_mse = 0.0
-
-        if goal is not None:
-            goal = self.scaler.scale_input(goal)
-            out = self.model(torch.cat([state, goal], dim=-1))
-        else:
-            out = self.model(state)
-
-        mse = F.mse_loss(out, action)  # , reduction="none")
-        total_mse += mse.mean(dim=-1).sum().item()
-        return total_mse
-
-    @torch.no_grad()
-    def predict(self, state, goal: Optional[torch.Tensor] = None, if_vision=False) -> torch.Tensor:
+    def predict(
+        self, state, goal: Optional[torch.Tensor] = None, if_vision=False
+    ) -> torch.Tensor:
         """
         Method for predicting one step with input data
         """
@@ -155,16 +131,40 @@ class BC_Agent(BaseAgent):
         if if_vision:
             bp_image, inhand_image, des_robot_pos = state
 
-            bp_image = torch.from_numpy(bp_image).to(self.device).float().unsqueeze(0).unsqueeze(0)
-            inhand_image = torch.from_numpy(inhand_image).to(self.device).float().unsqueeze(0).unsqueeze(0)
-            des_robot_pos = torch.from_numpy(des_robot_pos).to(self.device).float().unsqueeze(0).unsqueeze(0)
+            bp_image = (
+                torch.from_numpy(bp_image)
+                .to(self.device)
+                .float()
+                .unsqueeze(0)
+                .unsqueeze(0)
+            )
+            inhand_image = (
+                torch.from_numpy(inhand_image)
+                .to(self.device)
+                .float()
+                .unsqueeze(0)
+                .unsqueeze(0)
+            )
+            des_robot_pos = (
+                torch.from_numpy(des_robot_pos)
+                .to(self.device)
+                .float()
+                .unsqueeze(0)
+                .unsqueeze(0)
+            )
 
             des_robot_pos = self.scaler.scale_input(des_robot_pos)
 
             state = (bp_image, inhand_image, des_robot_pos)
 
         else:
-            state = torch.from_numpy(state).float().to(self.device).unsqueeze(0).unsqueeze(0)
+            state = (
+                torch.from_numpy(state)
+                .float()
+                .to(self.device)
+                .unsqueeze(0)
+                .unsqueeze(0)
+            )
             state = self.scaler.scale_input(state)
 
         if goal is not None:
@@ -178,26 +178,5 @@ class BC_Agent(BaseAgent):
         model_pred = self.scaler.inverse_scale_output(out)
         return model_pred.detach().cpu().numpy()[0]
 
-    def load_pretrained_model(self, weights_path: str, sv_name=None) -> None:
-        """
-        Method to load a pretrained model weights inside self.model
-        """
-
-        if sv_name is None:
-            self.model.load_state_dict(torch.load(os.path.join(weights_path, "model_state_dict.pth")))
-        else:
-            self.model.load_state_dict(torch.load(os.path.join(weights_path, sv_name)))
-        log.info('Loaded pre-trained model parameters')
-
-    def store_model_weights(self, store_path: str, sv_name=None) -> None:
-        """
-        Store the model weights inside the store path as model_weights.pth
-        """
-
-        if sv_name is None:
-            torch.save(self.model.state_dict(), os.path.join(store_path, "model_state_dict.pth"))
-        else:
-            torch.save(self.model.state_dict(), os.path.join(store_path, sv_name))
-            
     def reset(self):
         pass

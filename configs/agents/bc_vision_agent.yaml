@@ -22,8 +22,28 @@ model:
     device: ${device}
 
   obs_encoder:
-    _target_: torch.nn.Identity
-    output_dim: ${obs_dim}
+      _target_: agents.models.vision.multi_image_obs_encoder.MultiImageObsEncoder
+      shape_meta: &shape_meta
+        # acceptable types: rgb, low_dim
+        obs:
+          agentview_image:
+            shape: [ 3, 96, 96 ]
+            type: rgb
+          in_hand_image:
+            shape: [ 3, 96, 96 ]
+            type: rgb
+
+      rgb_model:
+        _target_: agents.models.vision.model_getter.get_resnet
+        input_shape: [ 3, 96, 96 ]
+        output_size: 64
+      resize_shape: null
+      #    crop_shape: [ 84, 84 ]
+      # constant center crop
+      random_crop: False
+      use_group_norm: True
+      share_rgb_model: False
+      imagenet_norm: True
 
 trainset: ${trainset}
 valset: ${valset}

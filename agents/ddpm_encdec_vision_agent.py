@@ -172,7 +172,7 @@ class DiffusionAgent(BaseAgent):
         self.obs_context = deque(maxlen=self.obs_seq_len)
         self.goal_context = deque(maxlen=self.goal_window_size)
 
-    def train_agent(self):
+    def train_state_based_agent(self):
 
         best_test_mse = 1e10
 

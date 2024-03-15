@@ -44,7 +44,7 @@ model:
     _target_: torch.nn.Identity
     output_dim: ${obs_dim}
 
-kl_loss_factor: 1.6412506376100464
+  kl_loss_factor: 1.6412506376100464
 
 trainset: ${trainset}
 valset: ${valset}

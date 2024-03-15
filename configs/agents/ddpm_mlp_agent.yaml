@@ -14,9 +14,9 @@ model:
 
     state_dim: ${obs_dim}
     action_dim: ${action_dim}
-    beta_schedule: 'cosine'
+    beta_schedule: "cosine"
     n_timesteps: 50
-    loss_type: 'l2'
+    loss_type: "l2"
     clip_denoised: true
     predict_epsilon: true
     device: ${device}
@@ -63,4 +63,3 @@ goal_window_size: 1
 window_size: ${window_size}
 diffusion_kde: false
 diffusion_kde_samples: 100
-goal_conditioned: False

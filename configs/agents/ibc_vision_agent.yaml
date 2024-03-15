@@ -49,26 +49,34 @@ model:
     share_rgb_model: False
     imagenet_norm: True
 
-sampler:
-  _target_: agents.models.ibc.samplers.langevin_mcmc.LangevinMCMCSampler
-  _recursive_: false
-  noise_scale: 0.1
-  noise_scale_infer: 0.5
-  noise_shrink: 0.894
-  train_samples: 8
-  inference_samples: 64
-  train_iterations: 40
-  inference_iterations: 10
-  sampler_stepsize_init: 0.0493 #0.894
-  sampler_stepsize_init_infer: 0.5
-  second_inference_stepsize_init: 0.00001
-  sampler_stepsize_decay: 0.8 #0.8655
-  sampler_stepsize_final: 0.00001
-  sampler_stepsize_power: 2.0
-  use_polynomial_rate: True
-  second_inference_iteration: True
-  delta_action_clip: 0.1
-  device: ${device}
+  sampler:
+    _target_: agents.models.ibc.samplers.langevin_mcmc.LangevinMCMCSampler
+    _recursive_: false
+    noise_scale: 0.1
+    noise_scale_infer: 0.5
+    noise_shrink: 0.894
+    train_samples: 8
+    inference_samples: 64
+    train_iterations: 40
+    inference_iterations: 10
+    sampler_stepsize_init: 0.0493 #0.894
+    sampler_stepsize_init_infer: 0.5
+    second_inference_stepsize_init: 0.00001
+    sampler_stepsize_decay: 0.8 #0.8655
+    sampler_stepsize_final: 0.00001
+    sampler_stepsize_power: 2.0
+    use_polynomial_rate: True
+    second_inference_iteration: True
+    delta_action_clip: 0.1
+    device: ${device}
+
+  loss_type: 'info_nce' # possible loss types: 'info_nce'  'cd' 'cd_kl'
+  avrg_e_regularization: 0
+  kl_loss_factor: 0.3
+  grad_norm_factor: 1
+  use_ema: False
+  decay: 0.999
+  update_ema_every_n_steps: 1
 
 optimization:
   _target_: torch.optim.AdamW
@@ -81,16 +89,6 @@ lr_scheduler:
   _target_: torch.optim.lr_scheduler.StepLR
   step_size: 200
   gamma: 0.99
-
-loss_type: 'info_nce' # possible loss types: 'info_nce'  'cd' 'cd_kl'
-avrg_e_regularization: 0
-kl_loss_factor: 0.3
-grad_norm_factor: 1
-use_ema: False
-decay: 0.999
-update_ema_every_n_steps: 1
-stop_value: 1
-goal_conditioning: False
 
 trainset: ${trainset}
 valset: ${valset}

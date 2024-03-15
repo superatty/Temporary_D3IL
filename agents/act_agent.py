@@ -92,7 +92,7 @@ class ActAgent(BaseAgent):
 
         self.act_buffer = torch.zeros(())
 
-    def train_agent(self):
+    def train_state_based_agent(self):
         """
         Train the agent on a given number of epochs
         """

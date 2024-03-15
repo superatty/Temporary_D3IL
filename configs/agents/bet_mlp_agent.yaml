@@ -31,11 +31,11 @@ model:
     _target_: torch.nn.Identity
     output_dim: ${obs_dim}
 
-action_ae:
-  _target_: agents.models.bet.action_ae.discretizers.k_means.KMeansDiscretizer
-  action_dim: ${action_dim}
-  device: ${device}
-  predict_offsets: True
+  action_ae:
+    _target_: agents.models.bet.action_ae.discretizers.k_means.KMeansDiscretizer
+    action_dim: ${action_dim}
+    device: ${device}
+    predict_offsets: True
 
 optimization:
   _target_: torch.optim.AdamW
