@@ -83,12 +83,9 @@ class DDPM_Agent(BaseAgent):
         epoch: int,
         scale_data,
         use_ema: bool,
-        discount: int,
         decay: float,
         update_ema_every_n_steps: int,
-        goal_window_size: int,
         window_size: int,
-        pred_last_action_only: bool = False,
         diffusion_kde: bool = False,
         diffusion_kde_samples: int = 100,
         eval_every_n_epochs: int = 50,
@@ -129,24 +126,13 @@ class DDPM_Agent(BaseAgent):
         self.eval_model_name = "eval_best_ddpm.pth"
         self.last_model_name = "last_ddpm.pth"
 
-        self.discount = discount
-        # here all the parameters required for the GPT variant
-        self.goal_window_size = goal_window_size
         self.window_size = window_size
-        self.pred_last_action_only = pred_last_action_only
 
         self.bp_image_context = deque(maxlen=self.window_size)
         self.inhand_image_context = deque(maxlen=self.window_size)
         self.des_robot_pos_context = deque(maxlen=self.window_size)
 
         self.obs_context = deque(maxlen=self.window_size)
-        self.goal_context = deque(maxlen=self.goal_window_size)
-        # if we use DiffusionGPT we need an action context
-        if not self.pred_last_action_only:
-            self.action_context = deque(maxlen=self.window_size - 1)
-            self.que_actions = True
-        else:
-            self.que_actions = False
 
         self.diffusion_kde = diffusion_kde
         self.diffusion_kde_samples = diffusion_kde_samples

@@ -421,13 +421,9 @@ class BesoAgent(BaseAgent):
 
             input_state = (bp_image_seq, inhand_image_seq, des_robot_pos_seq)
 
-            input_state = self.model.get_embedding(input_state)
-
         else:
             state = torch.from_numpy(state).float().to(self.device).unsqueeze(0)
             state = self.scaler.scale_input(state)
-            if goal is not None:
-                goal = self.scaler.scale_input(goal)
 
             self.obs_context.append(state)
             input_state = torch.stack(tuple(self.obs_context), dim=1)
