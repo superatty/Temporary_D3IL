@@ -26,9 +26,7 @@ class BC_Policy(nn.Module):
         super(BC_Policy, self).__init__()
 
         self.visual_input = visual_input
-
         self.obs_encoder = hydra.utils.instantiate(obs_encoder).to(device)
-
         self.model = hydra.utils.instantiate(model).to(device)
 
     def get_embedding(self, inputs):

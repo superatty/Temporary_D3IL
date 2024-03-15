@@ -7,7 +7,6 @@ import os
 import logging
 
 from agents.models.ibc.ebm_losses import *
-from agents.models.ibc.ema_helper.ema import ExponentialMovingAverage
 from agents.base_agent import BaseAgent
 from agents.models.ibc.samplers.langevin_mcmc import LangevinMCMCSampler
 from agents.models.ibc.samplers.noise_sampler import NoiseSampler
@@ -229,14 +228,6 @@ class IBC_Agent(BaseAgent):
     def predict(
         self, state: torch.Tensor, goal: Optional[torch.Tensor] = None, if_vision=False
     ) -> torch.Tensor:
-        """
-        Method for predicting one step with state data using the stochastic optimizer instance to generate
-        samples and return the best sample with the lowest energy
-
-        :param state:           torch.Tensor of observations    [B, O] with O: observation dim
-        :return                 torch.Tensor with best samples in shape [B, X] with X: action dim
-        """
-        # scale data if necessarry, otherwise returns unchanged values
 
         self.model.eval()
 
@@ -300,29 +291,6 @@ class IBC_Agent(BaseAgent):
 
         out = self.scaler.inverse_scale_output(out)
         return out.detach().cpu().numpy()
-
-    def store_model_weights(self, store_path: str, sv_name=None) -> None:
-        """
-        Store the model weights inside the store path as model_weights.pth
-        """
-        if self.use_ema:
-            self.ema_helper.store(self.model.parameters())
-            self.ema_helper.copy_to(self.model.parameters())
-
-        if sv_name is None:
-            torch.save(
-                self.model.state_dict(),
-                os.path.join(store_path, "model_state_dict.pth"),
-            )
-        else:
-            torch.save(self.model.state_dict(), os.path.join(store_path, sv_name))
-
-        if self.use_ema:
-            self.ema_helper.restore(self.model.parameters())
-        torch.save(
-            self.model.state_dict(),
-            os.path.join(store_path, "non_ema_model_state_dict.pth"),
-        )
 
     def reset(self):
         pass

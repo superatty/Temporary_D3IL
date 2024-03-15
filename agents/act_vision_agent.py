@@ -283,7 +283,6 @@ class ActAgent(BaseAgent):
         """
         Method for evaluating the model on one epoch of data
         """
-        # state, actions, goal = self.process_batch(batch, predict=True)
         self.model.eval()
 
         state = self.scaler.scale_input(state)
@@ -295,9 +294,6 @@ class ActAgent(BaseAgent):
 
         total_loss = action_loss + total_kld.mean()
 
-        # a_hat, (mu, logvar) = self.model(state, goal)
-        # loss = torch.mean((a_hat - actions) ** 2)
-        # total_mse = loss.item()
         return total_loss.item()
 
     @torch.no_grad()
@@ -320,13 +316,9 @@ class ActAgent(BaseAgent):
         if self.action_counter == self.action_seq_size:
             self.action_counter = 0
 
-            # state, goal, goal_task_name = self.process_batch(batch, predict=True)
-
             self.model.eval()
             if len(state.shape) == 2:
                 state = einops.rearrange(state, 'b d -> 1 b d')
-            # if len(goal.shape) == 2:
-            #     goal = einops.rearrange(goal, 'b d -> 1 b d')
 
             a_hat, (_, _) = self.model.model(state, goal)  # no action, sample from prior
 

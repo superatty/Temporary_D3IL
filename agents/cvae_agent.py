@@ -129,52 +129,7 @@ class CVAE_Agent(BaseAgent):
 
         self.min_action = torch.from_numpy(self.scaler.y_bounds[0, :]).to(self.device)
         self.max_action = torch.from_numpy(self.scaler.y_bounds[1, :]).to(self.device)
-
-    # def train_step(self, state, actions):
-    #     """
-    #     Executes a single training step on a mini-batch of data
-    #     """
-    #     self.model.train()
-
-    #     action_pred, mean, std = self.model(state, actions)
-
-    #     mse_loss = F.mse_loss(action_pred, actions)
-    #     # kl divergence part of the training loss
-    #     KL_loss = (
-    #         -0.5 * (1 + torch.log(std.pow(2) + 1e-8) - mean.pow(2) - std.pow(2)).mean()
-    #     )
-
-    #     loss = mse_loss + self.kl_loss_factor * KL_loss
-
-    #     self.optimizer.zero_grad(set_to_none=True)
-    #     loss.backward()
-    #     self.optimizer.step()
-
-    #     return loss.item()
-
-    # @torch.no_grad()
-    # def evaluate(self, state, actions):
-    #     """
-    #     Method for evaluating the model on one epoch of data
-    #     """
-    #     self.model.eval()
-
-    #     total_loss = 0.0
-
-    #     action_pred, mean, std = self.model(state, actions)
-
-    #     loss = F.mse_loss(action_pred, actions)
-    #     # kl divergence part of the training loss
-    #     KL_loss = (
-    #         -0.5 * (1 + torch.log(std.pow(2) + 1e-8) - mean.pow(2) - std.pow(2)).mean()
-    #     )
-
-    #     loss = loss + self.kl_loss_factor * KL_loss
-
-    #     total_loss += loss.mean(dim=-1).sum().item()
-
-    #     return total_loss
-
+        
     @torch.no_grad()
     def predict(self, state, if_vision=False) -> torch.Tensor:
         """

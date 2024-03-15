@@ -74,12 +74,13 @@ class BaseAgent(abc.ABC):
         else:
             self.lr_scheduler = None
 
-        self.ema_helper = ExponentialMovingAverage(
-            self.model.parameters(), decay, device
-        )
         self.use_ema = use_ema
-        self.decay = decay
-        self.update_ema_every_n_steps = update_ema_every_n_steps
+        if self.use_ema:
+            self.ema_helper = ExponentialMovingAverage(
+                self.model.parameters(), decay, device
+            )
+            self.decay = decay
+            self.update_ema_every_n_steps = update_ema_every_n_steps
         self.steps = 0
 
         self.eval_every_n_epochs = eval_every_n_epochs
@@ -261,15 +262,11 @@ class BaseAgent(abc.ABC):
         """
         pass
 
-    @abc.abstractmethod
     def reset(self) -> torch.Tensor:
         """
         Method for resetting the agent
         """
         pass
-
-    def get_scaler(self, scaler: Scaler):
-        self.scaler = scaler
 
     def load_pretrained_model(self, weights_path: str, sv_name=None) -> None:
         """
@@ -283,9 +280,10 @@ class BaseAgent(abc.ABC):
         else:
             self.model.load_state_dict(torch.load(os.path.join(weights_path, sv_name)))
 
-        self.ema_helper = ExponentialMovingAverage(
-            self.model.get_params(), self.decay, self.device
-        )
+        if self.use_ema:
+            self.ema_helper = ExponentialMovingAverage(
+                self.model.get_params(), self.decay, self.device
+            )
         log.info("Loaded pre-trained model parameters")
 
     def store_model_weights(self, store_path: str, sv_name=None) -> None:

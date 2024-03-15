@@ -151,65 +151,22 @@ class DDPM_Agent(BaseAgent):
         self.diffusion_kde = diffusion_kde
         self.diffusion_kde_samples = diffusion_kde_samples
 
-    # def train_step(self, state, action, goal: Optional[torch.Tensor] = None) -> float:
-    #     self.model.train()
-
-    #     if goal is not None:
-    #         goal = self.scaler.scale_input(goal)
-
-    #     # Compute the loss.
-    #     loss = self.model(state, goal, action=action, if_train=True)
-    #     # Before the backward pass, zero all the network gradients
-    #     self.optimizer.zero_grad()
-    #     # Backward pass: compute gradient of the loss with respect to parameters
-    #     loss.backward()
-    #     # Calling the step function to update the parameters
-    #     self.optimizer.step()
-
-    #     self.steps += 1
-
-    #     # update the ema model
-    #     if self.steps % self.update_ema_every_n_steps == 0:
-    #         self.ema_helper.update(self.model.parameters())
-    #     return loss
-
-    # @torch.no_grad()
-    # def evaluate(self, state, action, goal: Optional[torch.Tensor] = None) -> float:
-
-    #     if goal is not None:
-    #         goal = self.scaler.scale_input(goal)
-
-    #     total_mse = 0.0
-    #     # use the EMA model variant
-    #     if self.use_ema:
-    #         self.ema_helper.store(self.model.parameters())
-    #         self.ema_helper.copy_to(self.model.parameters())
-
-    #     self.model.eval()
-
-    #     # Compute the loss.
-    #     loss = self.model(state, goal, action=action, if_train=True)
-
-    #     total_mse += loss.mean().item()
-
-    #     # restore the previous model parameters
-    #     if self.use_ema:
-    #         self.ema_helper.restore(self.model.parameters())
-    #     return total_mse
 
     def reset(self):
         """Resets the context of the model."""
         self.obs_context.clear()
+        
+        self.bp_image_context.clear()
+        self.inhand_image_context.clear()
+        self.des_robot_pos_context.clear()
 
     @torch.no_grad()
     def predict(
         self,
         state: torch.Tensor,
         goal: Optional[torch.Tensor] = None,
-        extra_args=None,
         if_vision=False,
     ) -> torch.Tensor:
-        # scale data if necessarry, otherwise the scaler will return unchanged values
 
         if if_vision:
             bp_image, inhand_image, des_robot_pos = state
